@@ -1,0 +1,95 @@
+services:
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    restart: always
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+    environment:
+      - CLUSTER_NAME=spark_cluster
+    env_file:
+      - ./hadoop/hadoop.env
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    restart: always
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+    env_file:
+      - ./hadoop/hadoop.env
+    environment:
+      SERVICE_PRECONDITION: "namenode:9870"
+    depends_on:
+      - namenode
+
+  spark-master:
+    image: bde2020/spark-worker:3.0.0-hadoop3.2
+    container_name: spark-master
+    restart: always
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    volumes:
+      - ./spark/apps:/opt/spark-apps
+      - ./spark/data:/opt/spark-data
+    environment:
+      - SPARK_LOCAL_IP=spark-master
+    depends_on:
+      - namenode
+      - datanode
+
+  spark-worker-1:
+    image: bde2020/spark-worker:3.0.0-hadoop3.2
+    container_name: spark-worker-1
+    restart: always
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./spark/apps:/opt/spark-apps
+      - ./spark/data:/opt/spark-data
+    environment:
+      - SPARK_MASTER=spark://spark-master:7077
+      - SPARK_WORKER_CORES=2
+      - SPARK_WORKER_MEMORY=2g
+      - SPARK_LOCAL_IP=spark-worker-1
+    depends_on:
+      - spark-master
+
+  mariadb:
+    image: mariadb:10.6
+    container_name: mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: music_analysis
+      MYSQL_USER: sparkuser
+      MYSQL_PASSWORD: sparkpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  flask-app:
+    build: 
+      context: ./flask-app
+      dockerfile: Dockerfile
+    container_name: flask-app
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./flask-app:/app
+    depends_on:
+      - mariadb
+    environment:
+      - DATABASE_URL=mysql+pymysql://sparkuser:sparkpass@mariadb:3306/music_analysis
+
+volumes:
+  namenode_data:
+  datanode_data:
+  mariadb_data:
