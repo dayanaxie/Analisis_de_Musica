@@ -55,6 +55,7 @@ The flow is as follows:
      - Reads the CSV file.
      - Applies basic transformations/cleaning (depending on the dataset).
      - Writes the result in **Parquet format** into HDFS.
+     - It takes approximately 7 minutes to process the data.
 
 3. **Output in HDFS (Parquet format)**  
    - The files are stored in HDFS under the prefix:
