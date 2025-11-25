@@ -27,7 +27,7 @@ services:
       - namenode
 
   spark-master:
-    image: bde2020/spark-worker:3.0.0-hadoop3.2
+    image: bde2020/spark-master:3.0.0-hadoop3.2
     container_name: spark-master
     restart: always
     ports:
@@ -36,6 +36,8 @@ services:
     volumes:
       - ./spark/apps:/opt/spark-apps
       - ./spark/data:/opt/spark-data
+      - ./data/raw:/app/data/raw
+
     environment:
       - SPARK_LOCAL_IP=spark-master
     depends_on:
@@ -49,6 +51,7 @@ services:
     ports:
       - "8081:8081"
     volumes:
+      - ./data/raw:/app/data/raw
       - ./spark/apps:/opt/spark-apps
       - ./spark/data:/opt/spark-data
     environment:
@@ -88,6 +91,19 @@ services:
       - mariadb
     environment:
       - DATABASE_URL=mysql+pymysql://sparkuser:sparkpass@mariadb:3306/music_analysis
+
+  loader:
+    container_name: loader
+    hostname: loader
+    build: ./loader
+    environment:
+      - PYSPARK_PYTHON=/usr/bin/python3
+      - PYSPARK_DRIVER_PYTHON=/usr/bin/python3
+
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./data/raw:/app/data/raw
 
 volumes:
   namenode_data:

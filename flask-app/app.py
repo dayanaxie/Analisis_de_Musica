@@ -1,14 +1,22 @@
-from flask import Flask, jsonify
-import pymysql
 import time
+import pymysql
+import requests
+from flask import Flask, jsonify, render_template
 
 app = Flask(__name__)
 
-# Configuración de la base de datos
 app.config['DATABASE_HOST'] = 'mariadb'
 app.config['DATABASE_USER'] = 'sparkuser'
 app.config['DATABASE_PASSWORD'] = 'sparkpass'
 app.config['DATABASE_NAME'] = 'music_analysis'
+
+# url del microservicio loader 
+LOADER_URL = "http://loader:5001"
+
+loader_running = False
+loader_status = "idle"
+loader_logs = []
+
 
 def get_db_connection():
     return pymysql.connect(
@@ -20,67 +28,110 @@ def get_db_connection():
         cursorclass=pymysql.cursors.DictCursor
     )
 
+
 def check_db_connection(max_retries=10, retry_interval=5):
-    """Verifica la conexión a la base de datos con reintentos"""
     for attempt in range(max_retries):
         try:
-            connection = get_db_connection()
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1 as test")
-                result = cursor.fetchone()
-            
-            connection.close()
-            print(f"Conexión a MariaDB exitosa (intento {attempt + 1})")
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 AS ok")
+                cur.fetchone()
+            conn.close()
+            print(f"MariaDB: Conexión exitosa (intento {attempt + 1})")
             return True
-            
         except Exception as e:
-            print(f"Intento {attempt + 1}/{max_retries} falló: {str(e)}")
-            if attempt < max_retries - 1:
-                print(f"Reintentando en {retry_interval} segundos...")
-                time.sleep(retry_interval)
-    
+            print(f"Error de conexión (intento {attempt + 1}): {e}")
+            time.sleep(retry_interval)
     return False
 
-@app.route('/')
-def index():
-    return "Bienvenido al analizador de música :D"
 
-@app.route('/health')
-def health_check():
-    """Endpoint para verificar el estado de la aplicación y la BD"""
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
+@app.route("/admin/load-data", methods=["POST"])
+def trigger_loader():
+    global loader_status, loader_logs, loader_running
+
     try:
-        # Verificar conexión a la base de datos
-        connection = get_db_connection()
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT VERSION() as version")
-            db_version = cursor.fetchone()
-        
-        connection.close()
-        
-        return jsonify({
-            'status': 'healthy',
-            'database': 'connected',
-            'mysql_version': db_version['version'],
-            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
-        })
-    
+        loader_status_resp = requests.get(f"{LOADER_URL}/status", timeout=5).json()
+        if loader_status_resp.get("running"):
+            return jsonify({
+                "success": False,
+                "message": "Loader is already running",
+                "loader_status": loader_status_resp,
+            }), 409
     except Exception as e:
         return jsonify({
-            'status': 'unhealthy',
-            'database': 'disconnected',
-            'error': str(e),
-            'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
+            "success": False,
+            "message": "Loader service is unreachable",
+            "error": str(e)
+        }), 503
+
+    try:
+        response = requests.post(f"{LOADER_URL}/run-loader", timeout=3600)
+        data = response.json()
+
+        loader_running = data.get("status") == "running"
+        loader_status = data.get("status")
+        loader_logs = data.get("logs", [])
+
+        return jsonify(data)
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": "Failed to trigger loader",
+            "error": str(e)
         }), 500
 
+@app.route("/admin/loader-status")
+def loader_status_route():
+    try:
+        data = requests.get(f"{LOADER_URL}/status", timeout=5).json()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": "Loader service unreachable",
+            "error": str(e)
+        }), 503
 
-# Verificar la conexión al iniciar la aplicación
-if __name__ == '__main__':
-    print("Iniciando aplicación Flask...")
+@app.route("/health")
+def health():
+    db_ok = False
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT VERSION() as version")
+            version = cursor.fetchone()
+        conn.close()
+        db_ok = True
+    except Exception as e:
+        version = {"error": str(e)}
+
+    try:
+        loader_resp = requests.get(f"{LOADER_URL}/status", timeout=5).json()
+        loader_ok = True
+    except:
+        loader_resp = {"error": "loader unreachable"}
+        loader_ok = False
+
+    return jsonify({
+        "status": "healthy" if db_ok and loader_ok else "unhealthy",
+        "database": "connected" if db_ok else "disconnected",
+        "mysql_version": version,
+        "loader_service": loader_resp
+    })
+
+if __name__ == "__main__":
+    print("Iniciando Flask...")
     print("Verificando conexión a MariaDB...")
-    
+
     if check_db_connection():
-        print("Aplicación conectada con MariaDB")
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        print("Conexión exitosa. Iniciando servidor Flask...")
+        app.run(host="0.0.0.0", port=5000, debug=False, use_reloader=False)
     else:
-        print("No se pudo establecer conexión con MariaDB")
+        print("Error: No se pudo conectar a MariaDB.")
         exit(1)

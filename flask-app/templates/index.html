@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Music Data Loader</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .status { padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .running { background: #fff3cd; border: 1px solid #ffeaa7; }
+        .completed { background: #d1ecf1; border: 1px solid #bee5eb; }
+        .not-started { background: #f8d7da; border: 1px solid #f5c6cb; }
+        .loading { display: inline-block; width: 20px; height: 20px; border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <h1>🎵 Music Data Loader</h1>
+    
+    <div id="status" class="status"></div>
+    
+    <div>
+        <button onclick="runLoader()">🔄 Ejecutar Loader</button>
+        <button onclick="checkStatus()">🔄 Actualizar Estado</button>
+    </div>
+
+    <script>
+        function updateStatus() {
+            fetch('/admin/loader-status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusDiv = document.getElementById('status');
+                    let html = '';
+
+                    if (data.running === true) {
+                        html = `<div class="status running">
+                            <h2>🔄 Loader en ejecución...</h2>
+                            <div class="loading"></div>
+                            <p>Procesando datos...</p>
+                        </div>`;
+                    } 
+                    else if (data.status === "completed") {
+                        html = `<div class="status completed">
+                            <h2>✅ Loader completado</h2>
+                            <p>Proceso finalizado. Puedes ejecutar nuevamente si deseas.</p>
+                        </div>`;
+                    } 
+                    else {
+                        html = `<div class="status not-started">
+                            <h2>⏳ Loader listo</h2>
+                            <p>Presiona el botón para ejecutar el loader.</p>
+                        </div>`;
+                    }
+
+                    statusDiv.innerHTML = html;
+                });
+        }
+
+        function runLoader() {
+            fetch('/admin/load-data', {
+                method: "POST"   
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message || "Loader ejecutado.");
+                updateStatus();
+            })
+            .catch(err => {
+                alert("Error ejecutando el loader: " + err);
+            });
+        }
+
+        function checkStatus() {
+            updateStatus();
+        }
+
+        // Al iniciar
+        updateStatus();
+    </script>
+</body>
+</html>
