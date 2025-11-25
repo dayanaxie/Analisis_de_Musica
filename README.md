@@ -29,6 +29,26 @@ The project runs in a small web application built with **Flask**, which runs ins
 
 ---
 
+### Accessing the application
+
+Once all the services are up, you can access the different parts of the system through these URLs:
+
+- **Spark Master Web UI**:
+  Used to monitor the Spark cluster, jobs, stages and executors:
+  - `http://localhost:8080/`
+
+- **Web application (Flask front-end)**:
+  - `http://localhost:5000/`
+
+- **Loader status endpoint**  
+  The result of the data loading process (success, errors, files processed, etc.) can be checked at:
+  - `http://localhost:5001/status`
+
+These endpoints make it easy to verify that the stack is running, inspect the web UI, and confirm that the CSV files were successfully loaded into HDFS in Parquet format.
+
+---
+
+
 ### Data loader (`data_loader.py`)
 
 The `data_loader.py` script is responsible **only for loading the CSV datasets into HDFS in Parquet format**, leaving them ready for later analysis.
