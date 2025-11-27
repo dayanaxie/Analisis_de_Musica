@@ -102,4 +102,21 @@ The flow is as follows:
      hdfs dfs -ls /processed_data/parquet/users
      ```
    - If you see several `part-0000x-...snappy.parquet` files with a size greater than 0, it means the load from the loader to HDFS completed successfully.
-````
+---
+
+### Useful commands and quality of life
+
+| Objective | Command |
+|----------|---------|
+| **View service logs** | `docker compose logs -f analytics` |
+| **Lift the containers for analysis and consultation** | `docker compose up -d namenode datanode spark-master spark-worker-1 mariadb` |
+| **Access the Spark container** | `docker compose exec spark-master bash` |
+| **View files in HDFS** | `docker compose exec namenode hdfs dfs -ls /processed_data/parquet` |
+| **Connect to MariaDB** | `docker compose exec -it mariadb mariadb -u sparkuser -psparkpass music_analysis` |
+| **View top artist chart** | `SELECT * FROM top_20_artists;` |
+| **Rebuild analytics only** | `docker compose build analytics` |
+| **Run analytics only** | `docker compose run analytics` |
+| **Shut down containers without deleting data** | `docker compose down` |
+| **Shut down containers and delete all data** | `docker compose down -v` ⚠️ |
+
+--- 

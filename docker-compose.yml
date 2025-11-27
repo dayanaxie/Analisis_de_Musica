@@ -72,7 +72,7 @@ services:
       MYSQL_USER: sparkuser
       MYSQL_PASSWORD: sparkpass
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
       - ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -90,7 +90,7 @@ services:
     depends_on:
       - mariadb
     environment:
-      - DATABASE_URL=mysql+pymysql://sparkuser:sparkpass@mariadb:3306/music_analysis
+      - DATABASE_URL=mysql+pymysql://sparkuser:sparkpass@mariadb:3307/music_analysis
 
   loader:
     container_name: loader
@@ -104,6 +104,23 @@ services:
       - "5001:5001"
     volumes:
       - ./data/raw:/app/data/raw
+
+  analytics:
+    container_name: analytics
+    hostname: analytics
+    build: ./spark/apps
+    environment:
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - HDFS_URL=hdfs://namenode:9000
+      - DB_URL=jdbc:mysql://mariadb:3306/music_analysis
+      - DB_USER=sparkuser
+      - DB_PASSWORD=sparkpass
+    volumes:
+      - ./spark/apps:/app
+    depends_on:
+      - spark-master
+      - mariadb
+    command: ["python", "/app/analytics.py"]
 
 volumes:
   namenode_data:
