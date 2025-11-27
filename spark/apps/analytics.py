@@ -47,6 +47,7 @@ def create_spark_session(app_name="MusicAnalytics"):
 # FUNCIONES DE ANÁLISIS
 # ============================
 
+# ---------- TOP 20 ARTISTAS ----------
 def top_20_artistas(spark):
     df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
     top_artists = (
@@ -56,6 +57,29 @@ def top_20_artistas(spark):
         .limit(20)
     )
     return top_artists
+
+# ---------- TOP 20 CANCIONES ----------
+def top_20_canciones(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
+    top_tracks = (
+        df.groupBy("track_name")
+        .agg(count("*").alias("mentions"))
+        .orderBy(desc("mentions"))
+        .limit(20)
+    )
+    return top_tracks
+
+
+# ---------- TOP 20 ÁLBUMES ----------
+def top_20_albumes(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_albums")
+    top_albums = (
+        df.groupBy("album_name")
+        .agg(count("*").alias("mentions"))
+        .orderBy(desc("mentions"))
+        .limit(20)
+    )
+    return top_albums
 
 # ============================
 # GUARDAR EN MARIADB
@@ -81,6 +105,17 @@ def main():
     print("Calculando Top 20 Artistas...")
     top_artists = top_20_artistas(spark)
     top_artists.show()
+    save_to_mysql(top_artists, "top_20_artists")
+
+    print("Calculando Top 20 Canciones...")
+    top_tracks = top_20_canciones(spark)
+    top_tracks.show()
+    save_to_mysql(top_tracks, "top_20_tracks")
+
+    print("Calculando Top 20 Álbumes...")
+    top_albums = top_20_albumes(spark)
+    top_albums.show()
+    save_to_mysql(top_albums, "top_20_albums")
 
     print("Guardando en MariaDB...")
     save_to_mysql(top_artists, "top_20_artists")

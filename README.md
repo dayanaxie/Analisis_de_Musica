@@ -113,10 +113,12 @@ The flow is as follows:
 | **Access the Spark container** | `docker compose exec spark-master bash` |
 | **View files in HDFS** | `docker compose exec namenode hdfs dfs -ls /processed_data/parquet` |
 | **Connect to MariaDB** | `docker compose exec -it mariadb mariadb -u sparkuser -psparkpass music_analysis` |
-| **View top artist chart** | `SELECT * FROM top_20_artists;` |
 | **Rebuild analytics only** | `docker compose build analytics` |
 | **Run analytics only** | `docker compose run analytics` |
 | **Shut down containers without deleting data** | `docker compose down` |
+| **View top artist chart** | `SELECT * FROM top_20_artists;` |
+| **View top tracks chart** | `SELECT * FROM top_20_tracks;` |
+| **View top albums chart** | `SELECT * FROM top_20_albums;` |
 | **Shut down containers and delete all data** | `docker compose down -v` ⚠️ |
 
 --- 
