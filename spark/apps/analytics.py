@@ -96,11 +96,15 @@ def save_to_mysql(df, table_name):
         .save()
 
 # ============================
-# EJECUCIÓN PRINCIPAL
+# FUNCIÓN PARA CORRER EL ANÁLISIS
 # ============================
 
-def main():
-    spark = create_spark_session()
+def run_analysis(spark=None):
+    """Ejecuta todo el análisis y guarda los resultados en MariaDB."""
+    created_here = False
+    if spark is None:
+        spark = create_spark_session()
+        created_here = True
 
     print("Calculando Top 20 Artistas...")
     top_artists = top_20_artistas(spark)
@@ -117,11 +121,14 @@ def main():
     top_albums.show()
     save_to_mysql(top_albums, "top_20_albums")
 
-    print("Guardando en MariaDB...")
-    save_to_mysql(top_artists, "top_20_artists")
+    if created_here:
+        spark.stop()
 
-    spark.stop()
-    print("✅ Análisis completado y guardado en MariaDB.")
+    print("Análisis completado y guardado en MariaDB.")
+
+# ============================
+# EJECUCIÓN COMO SCRIPT
+# ============================
 
 if __name__ == "__main__":
-    main()
+    run_analysis()

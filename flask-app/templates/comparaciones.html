@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Análisis de música – Comparaciones simples</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1 class="app-title">Análisis de música</h1>
+      <p class="app-subtitle">Panel para explorar métricas y comportamiento de escucha.</p>
+    </header>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-title">Preprocesamiento</div>
+        <ul class="tab-list">
+          <li><a href="{{ url_for('loader') }}" class="tab-link">Loader</a></li>
+          <li><a href="{{ url_for('analysis_page') }}" class="tab-link">Análisis</a></li>
+        </ul>
+        <div class="sidebar-title">Visualizador</div>
+          <ul class="tab-list">
+            <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
+            <li><a href="{{ url_for('conteos') }}" class="tab-link">Conteos simples por usuario</a></li>
+            <li><a href="{{ url_for('concurrencia') }}" class="tab-link">Concurrencia y posiciones</a></li>
+            <li><a href="{{ url_for('comparaciones') }}" class="tab-link active">Comparaciones simples</a></li>
+            <li><a href="{{ url_for('calidad') }}" class="tab-link ">Calidad</a></li>
+          </ul>
+      </aside>
+
+      <main class="page-main">
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Comparaciones simples</h2>
+              <p class="card-subtitle">
+                Sección para contrastar usuarios, artistas, listas o periodos de tiempo de forma directa.
+              </p>
+            </div>
+          </div>
+
+          <div class="page-empty">
+            Puedes usar este panel para comparaciones lado a lado, tablas resumidas o indicadores clave.
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

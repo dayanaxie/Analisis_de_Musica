@@ -117,10 +117,11 @@ services:
       - DB_PASSWORD=sparkpass
     volumes:
       - ./spark/apps:/app
+    ports:
+      - "5002:5002"
     depends_on:
       - spark-master
       - mariadb
-    command: ["python", "/app/analytics.py"]
 
 volumes:
   namenode_data:

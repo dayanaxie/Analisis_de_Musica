@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Análisis de música – Análisis global</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1 class="app-title">Análisis de música</h1>
+      <p class="app-subtitle">Panel para ejecutar y monitorear el análisis datos con Spark.</p>
+    </header>
+
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-title">Preprocesamiento</div>
+        <ul class="tab-list">
+          <li><a href="{{ url_for('loader') }}" class="tab-link">Loader</a></li>
+          <li><a href="{{ url_for('analysis_page') }}" class="tab-link active">Análisis</a></li>
+
+        </ul>
+        <div class="sidebar-title">Visualizador</div>
+          <ul class="tab-list">
+            <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
+            <li><a href="{{ url_for('conteos') }}" class="tab-link">Conteos simples por usuario</a></li>
+            <li><a href="{{ url_for('concurrencia') }}" class="tab-link">Concurrencia y posiciones</a></li>
+            <li><a href="{{ url_for('comparaciones') }}" class="tab-link">Comparaciones simples</a></li>
+            <li><a href="{{ url_for('calidad') }}" class="tab-link">Calidad</a></li>
+          </ul>
+      </aside>
+
+      <main class="page-main">
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Ejecución de análisis</h2>
+              <p class="card-subtitle">
+                Lanza el job de Spark y guarda los resultados en la base de datos.
+              </p>
+            </div>
+          </div>
+
+          <div id="analysis-status" class="status-panel"></div>
+
+          <div class="actions-row">
+            <button id="btn-run-analysis" class="btn btn-primary">
+              Ejecutar análisis
+            </button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

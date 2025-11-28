@@ -1,7 +1,8 @@
 import time
 import pymysql
 import requests
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, redirect, url_for
+
 
 app = Flask(__name__)
 
@@ -10,12 +11,17 @@ app.config['DATABASE_USER'] = 'sparkuser'
 app.config['DATABASE_PASSWORD'] = 'sparkpass'
 app.config['DATABASE_NAME'] = 'music_analysis'
 
-# url del microservicio loader 
 LOADER_URL = "http://loader:5001"
+ANALYSIS_URL = "http://analytics:5002"
+
 
 loader_running = False
 loader_status = "idle"
 loader_logs = []
+
+analysis_running = False
+analysis_status = "idle"
+analysis_logs = []
 
 
 def get_db_connection():
@@ -47,7 +53,36 @@ def check_db_connection(max_retries=10, retry_interval=5):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("loader.html")
+
+@app.route("/loader")
+def loader():
+    return render_template("loader.html")
+
+@app.route("/popularidad")
+def popularidad():
+    return render_template("popularidad.html")
+
+@app.route("/conteos")
+def conteos():
+    return render_template("conteos.html")
+
+@app.route("/concurrencia")
+def concurrencia():
+    return render_template("concurrencia.html")
+
+@app.route("/comparaciones")
+def comparaciones():
+    return render_template("comparaciones.html")
+
+@app.route("/calidad")
+def calidad():
+    return render_template("calidad.html")
+
+@app.route("/analysis")
+def analysis_page():
+    return render_template("analysis.html")
+
 
 
 @app.route("/admin/load-data", methods=["POST"])
@@ -97,6 +132,29 @@ def loader_status_route():
             "message": "Loader service unreachable",
             "error": str(e)
         }), 503
+
+@app.route("/admin/run-analysis", methods=["POST"])
+def trigger_analysis():
+    global analysis_status, analysis_logs, analysis_running
+
+    try:
+        response = requests.post(f"{ANALYSIS_URL}/run-analysis", timeout=3600)
+        data = response.json()
+
+        analysis_status = data.get("status", "unknown")
+        analysis_running = analysis_status == "running"
+        analysis_logs = data.get("logs", [])
+
+        return jsonify(data), response.status_code
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "status": "error",
+            "message": "Failed to trigger analysis service",
+            "error": str(e)
+        }), 500
+
 
 @app.route("/health")
 def health():

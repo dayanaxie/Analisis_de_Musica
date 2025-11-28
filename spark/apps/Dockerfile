@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. PySpark
-RUN pip install --no-cache-dir pyspark==3.0.0
+RUN pip install --no-cache-dir pyspark==3.0.0 \
+    flask
 
 # 3. Descargar el driver JDBC de MySQL
 RUN mkdir -p /opt/spark/jars && \
@@ -21,4 +22,4 @@ ENV SPARK_CLASSPATH=/opt/spark/jars/mysql-connector-j-8.0.33.jar
 
 WORKDIR /app
 COPY . .
-CMD ["python", "analytics.py"]
+CMD ["python", "app.py"]
