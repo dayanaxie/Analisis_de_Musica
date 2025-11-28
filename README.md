@@ -119,6 +119,9 @@ The flow is as follows:
 | **View top artist chart** | `SELECT * FROM top_20_artists;` |
 | **View top tracks chart** | `SELECT * FROM top_20_tracks;` |
 | **View top albums chart** | `SELECT * FROM top_20_albums;` |
+| **View top albums chart** | `SELECT * FROM same_top1_artist;` |
+| **View top albums chart** | `SELECT * FROM artist_mention_stats;` |
+| **View top albums chart** | `SELECT * FROM long_tail_80;` |
 | **Shut down containers and delete all data** | `docker compose down -v` ⚠️ |
 
 --- 

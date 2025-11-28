@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, desc, count, countDistinct, lit
+from pyspark.sql.window import Window
+from pyspark.sql.functions import col, desc, count, countDistinct, lit, row_number, sum as _sum, percent_rank
 import os
 
 # ============================
@@ -83,6 +84,57 @@ def top_20_albumes(spark):
              .limit(20))
     return top
 
+# ---------- USUARIOS CON EL MISMO ARTISTA #1 ----------
+def same_artista_numero1(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    # ranking por usuario
+    w = Window.partitionBy("user_id").orderBy(desc("playcount"))
+    rank_df = (df.withColumn("rn", row_number().over(w))
+                 .filter("rn = 1")
+                 .select("user_id", "artist_name"))
+    # contar cuántos tienen el mismo artista principal
+    top1 = (rank_df.groupBy("artist_name")
+                   .agg(countDistinct("user_id").alias("users_count"))
+                   .orderBy(desc("users_count"))
+                   .limit(1))
+    total_users = rank_df.select("user_id").distinct().count() or 1
+    top1 = top1.withColumn("percentage", lit(100.0) * col("users_count") / total_users)
+    return top1
+
+
+# ---------- DISTRIBUCIÓN DE MENCIONES POR ARTISTA ----------
+def artist_mention_histogram(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    mentions = df.groupBy("artist_name").agg(count("*").alias("mentions"))
+    desc = mentions.select("mentions").summary("mean", "50%", "stddev") \
+                   .withColumnRenamed("summary", "metric") \
+                   .withColumnRenamed("mentions", "value")
+    # cambio nombres para que la tabla quede limpia
+    desc = desc.replace({"50%": "median"}, subset="metric")
+    return desc
+
+
+# ---------- LONG TAIL 80 % ----------
+def long_tail_80(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    mentions = df.groupBy("artist_name").agg(count("*").alias("mentions"))
+    total_mentions = mentions.agg(_sum("mentions")).collect()[0][0] or 1
+    # ordenar de más a menos mencionado
+    ordered = mentions.orderBy(desc("mentions"))
+    # columna acumulada
+    ordered = ordered.withColumn("cum", _sum("mentions").over(Window.orderBy(desc("mentions"))))
+    # filtrar hasta el 80 % del total
+    tail = ordered.filter(col("cum") <= 0.8 * total_mentions)
+    total_artists = mentions.count()
+    tail_artists = tail.count()
+    tail_pct = 100.0 * tail_artists / total_artists if total_artists else 0.0
+    # devolvemos un solo-row DataFrame
+    return spark.createDataFrame(
+        [(total_artists, tail_artists, round(tail_pct, 2))],
+        ["total_artists", "artists_in_tail", "tail_percentage"]
+    )
+
+
 # ============================
 # GUARDAR EN MARIADB
 # ============================
@@ -122,6 +174,21 @@ def run_analysis(spark=None):
     top_albums = top_20_albumes(spark)
     top_albums.show()
     save_to_mysql(top_albums, "top_20_albums")
+
+    print("Calculando usuarios que comparten el mismo artista #1...")
+    same_top1 = same_artista_numero1(spark)
+    same_top1.show()
+    save_to_mysql(same_top1, "same_top1_artist")
+
+    print("Calculando estadísticos de menciones por artista...")
+    hist_stats = artist_mention_histogram(spark)
+    hist_stats.show()
+    save_to_mysql(hist_stats, "artist_mention_stats")
+
+    print("Calculando long-tail 80 %...")
+    tail_df = long_tail_80(spark)
+    tail_df.show()
+    save_to_mysql(tail_df, "long_tail_80")
 
     if created_here:
         spark.stop()
