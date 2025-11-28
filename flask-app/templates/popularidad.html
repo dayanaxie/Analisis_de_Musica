@@ -1,53 +1,244 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <title>Análisis de música – Popularidad y frecuencias</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-  <div class="app">
-    <header class="app-header">
-      <h1 class="app-title">Análisis de música</h1>
-      <p class="app-subtitle">Panel para explorar métricas y comportamiento de escucha.</p>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Análisis de música – Popularidad y frecuencias</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <h1 class="app-title">Análisis de música</h1>
+        <p class="app-subtitle">
+          Panel para explorar métricas y comportamiento de escucha.
+        </p>
+      </header>
 
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="sidebar-title">Preprocesamiento</div>
-        <ul class="tab-list">
-          <li><a href="{{ url_for('loader') }}" class="tab-link">Loader</a></li>
-          <li><a href="{{ url_for('analysis_page') }}" class="tab-link">Análisis</a></li>
-
-        </ul>
-        <div class="sidebar-title">Visualizador</div>
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="sidebar-title">Preprocesamiento</div>
           <ul class="tab-list">
-            <li><a href="{{ url_for('popularidad') }}" class="tab-link active">Popularidad y frecuencias</a></li>
-            <li><a href="{{ url_for('conteos') }}" class="tab-link">Conteos simples por usuario</a></li>
-            <li><a href="{{ url_for('concurrencia') }}" class="tab-link">Concurrencia y posiciones</a></li>
-            <li><a href="{{ url_for('comparaciones') }}" class="tab-link">Comparaciones simples</a></li>
-            <li><a href="{{ url_for('calidad') }}" class="tab-link">Calidad</a></li>
+            <li>
+              <a href="{{ url_for('loader') }}" class="tab-link">Loader</a>
+            </li>
+            <li>
+              <a href="{{ url_for('analysis_page') }}" class="tab-link"
+                >Análisis</a
+              >
+            </li>
           </ul>
-      </aside>
+          <div class="sidebar-title">Visualizador</div>
+          <ul class="tab-list">
+            <li>
+              <a href="{{ url_for('popularidad') }}" class="tab-link active"
+                >Popularidad y frecuencias</a
+              >
+            </li>
+            <li>
+              <a href="{{ url_for('conteos') }}" class="tab-link"
+                >Conteos simples por usuario</a
+              >
+            </li>
+            <li>
+              <a href="{{ url_for('concurrencia') }}" class="tab-link"
+                >Concurrencia y posiciones</a
+              >
+            </li>
+            <li>
+              <a href="{{ url_for('comparaciones') }}" class="tab-link"
+                >Comparaciones simples</a
+              >
+            </li>
+            <li>
+              <a href="{{ url_for('calidad') }}" class="tab-link">Calidad</a>
+            </li>
+          </ul>
+        </aside>
 
-      <main class="page-main">
-        <section class="card">
-          <div class="card-header">
-            <div>
-              <h2 class="card-title">Popularidad y frecuencias</h2>
-              <p class="card-subtitle">
-                Aquí se podrán visualizar distribuciones de escuchas, rankings y patrones de uso.
-              </p>
+        <main class="page-main">
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Top 20 Artistas</h2>
+                <p class="card-subtitle">
+                  % de usuarios que incluyen al artista en su top
+                </p>
+              </div>
             </div>
-          </div>
+            <canvas id="chartArtists" height="120"></canvas>
+          </section>
 
-          <div class="page-empty">
-            Esta sección está disponible para que agregues tus gráficos, tablas o visualizaciones
-            de popularidad cuando el loader haya finalizado.
-          </div>
-        </section>
-      </main>
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Top 20 Canciones</h2>
+                <p class="card-subtitle">
+                  Misma métrica que artistas, pero para tracks
+                </p>
+              </div>
+            </div>
+            <canvas id="chartTracks" height="120"></canvas>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Top 20 Álbumes</h2>
+                <p class="card-subtitle">
+                  Álbumes más populares entre los usuarios
+                </p>
+              </div>
+            </div>
+            <canvas id="chartAlbums" height="120"></canvas>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Artista #1 más común</h2>
+                <p class="card-subtitle">
+                  Artista principal favorito de la audiencia
+                </p>
+              </div>
+            </div>
+            <canvas id="chartTop1" height="80"></canvas>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Long-Tail 80 %</h2>
+                <p class="card-subtitle">
+                  % de artistas que acumulan el 80 % de menciones
+                </p>
+              </div>
+            </div>
+            <canvas id="chartLongTail" height="80"></canvas>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Distribución de menciones</h2>
+                <p class="card-subtitle">
+                  Media, mediana y desviación estándar
+                </p>
+              </div>
+            </div>
+            <canvas id="chartStats" height="80"></canvas>
+          </section>
+        </main>
+      </div>
     </div>
-  </div>
-</body>
+
+    <!-- Scripts para gráficos -->
+    <script>
+      /* ---------- helpers ---------- */
+      const bgColor = 'rgba(79, 70, 229, 0.55)';
+      const borderColor = 'rgba(79, 70, 229, 1)';
+      const font = { family: 'system-ui', size: 12 };
+           
+
+      function horizontalBar(canvasId, labels, data){
+        const barCount = labels.length;
+        const ctx = document.getElementById(canvasId);
+        ctx.height = Math.max(120, barCount * 18);   
+
+        new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{ data, backgroundColor: bgColor, borderColor, borderWidth: 1 }]
+          },
+          options: {
+            indexAxis: 'y',
+            plugins: { legend: { display: false } },
+            scales: {
+              y: {
+                ticks: {
+                  color: '#9ca3af',
+                  font: { size: 11 },
+                  autoSkip: false,     // ← muestra todas
+                  maxTicksLimit: barCount
+                },
+                grid: { display: false }
+              },
+              x: {
+                ticks: { color: '#9ca3af', font },
+                grid: { color: 'rgba(148,163,184,0.15)' }
+              }
+            }
+          }
+        });
+      }
+
+      function doughnut(ctx, label, value, total, text){
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: [label, 'Resto'],
+            datasets: [{ data: [value, total - value],
+                        backgroundColor: [borderColor, 'rgba(148,163,184,0.15)'],
+                        borderWidth: 0 }]
+          },
+          options: { cutout: '70%',
+                    plugins: { legend: { display: false },
+                                tooltip: { callbacks: { label: (t) => `${t.label}: ${t.parsed}%` } } } }
+        });
+      }
+
+      /* ---------- carga de datos ---------- */
+      Promise.all([
+        fetch('/api/top20/artists').then(r => r.json()),
+        fetch('/api/top20/tracks').then(r => r.json()),
+        fetch('/api/top20/albums').then(r => r.json()),
+        fetch('/api/top1/artist').then(r => r.json()),
+        fetch('/api/longtail').then(r => r.json()),
+        fetch('/api/mention/stats').then(r => r.json())
+      ]).then(([topA, topT, topB, top1, tail, stats]) => {
+
+        /* top 20 */
+        horizontalBar('chartArtists', topA.map(r => r.artist_name), topA.map(r => r.percentage));
+        horizontalBar('chartTracks', topT.map(r => r.track_name), topT.map(r => r.percentage));
+        horizontalBar('chartAlbums', topB.map(r => r.album_name), topB.map(r => r.percentage));
+                      
+        /* top1 artist */
+        if(top1.length){
+          const row = top1[0];
+          doughnut(document.getElementById('chartTop1'),
+                  row.top1_artist,
+                  row.percentage, 100,
+                  `${row.percentage}%`);
+        }
+
+        /* long tail */
+        if(tail.length){
+          const t = tail[0];
+          doughnut(document.getElementById('chartLongTail'),
+                  'Artistas en cola larga',
+                  t.tail_percentage, 100,
+                  `${t.tail_percentage}%`);
+        }
+
+        /* stats bar */
+        const labels = stats.map(s => s.metric);
+        const values = stats.map(s => parseFloat(s.value));
+        new Chart(document.getElementById('chartStats'), {
+          type: 'bar',
+          data: { labels, datasets: [{ data: values, backgroundColor: bgColor, borderColor, borderWidth: 1 }] },
+          options: { plugins: { legend: false },
+                    scales: { y: { beginAtZero: true, ticks: { color: '#9ca3af', font },
+                                    grid: { color: 'rgba(148,163,184,0.15)' } },
+                              x: { ticks: { color: '#9ca3af', font },
+                                    grid: { display: false } } } }
+        });
+
+      });
+    </script>
+
+  </body>
 </html>

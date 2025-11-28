@@ -59,9 +59,60 @@ def index():
 def loader():
     return render_template("loader.html")
 
+
+# ---------- POPULARIDAD – JSON PARA CHARTS ----------
+
 @app.route("/popularidad")
 def popularidad():
     return render_template("popularidad.html")
+
+def query_to_json(sql):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+        return rows
+    finally:
+        conn.close()
+
+@app.route("/api/top20/artists")
+def api_top20_artists():
+    return jsonify(query_to_json(
+        "SELECT artist_name, users_count, percentage "
+        "FROM top_20_artists ORDER BY users_count DESC LIMIT 20"))
+
+@app.route("/api/top20/tracks")
+def api_top20_tracks():
+    return jsonify(query_to_json(
+        "SELECT track_name, users_count, percentage "
+        "FROM top_20_tracks ORDER BY users_count DESC LIMIT 20"))
+
+@app.route("/api/top20/albums")
+def api_top20_albums():
+    return jsonify(query_to_json(
+        "SELECT album_name, users_count, percentage "
+        "FROM top_20_albums ORDER BY users_count DESC LIMIT 20"))
+
+@app.route("/api/top1/artist")
+def api_top1_artist():
+    rows = query_to_json(
+        "SELECT artist_name AS top1_artist, users_count, percentage "
+        "FROM same_top1_artist")
+    if not rows:
+        return jsonify([])
+    return jsonify(rows)
+
+@app.route("/api/mention/stats")
+def api_mention_stats():
+    return jsonify(query_to_json(
+        "SELECT metric, value FROM artist_mention_stats"))
+
+@app.route("/api/longtail")
+def api_longtail():
+    return jsonify(query_to_json(
+        "SELECT total_artists, artists_in_tail, tail_percentage FROM long_tail_80"))
+
 
 @app.route("/conteos")
 def conteos():
@@ -82,6 +133,8 @@ def calidad():
 @app.route("/analysis")
 def analysis_page():
     return render_template("analysis.html")
+
+
 
 
 
