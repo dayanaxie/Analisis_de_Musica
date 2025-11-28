@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, desc, count
+from pyspark.sql.functions import col, desc, count, countDistinct, lit
 import os
 
 # ============================
@@ -47,39 +47,41 @@ def create_spark_session(app_name="MusicAnalytics"):
 # FUNCIONES DE ANÁLISIS
 # ============================
 
-# ---------- TOP 20 ARTISTAS ----------
+
+# ---------- TOP 20 ARTISTAS (CORREGIDO) ----------
 def top_20_artistas(spark):
     df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
-    top_artists = (
-        df.groupBy("artist_name")
-        .agg(count("*").alias("mentions"))
-        .orderBy(desc("mentions"))
-        .limit(20)
-    )
-    return top_artists
+    total_users = df.select("user_id").distinct().count() or 1
+    top = (df.groupBy("artist_name")
+             .agg(countDistinct("user_id").alias("users_count"))
+             .withColumn("percentage", lit(100.0) * col("users_count") / total_users)
+             .orderBy(desc("users_count"))
+             .limit(20))
+    return top
+
 
 # ---------- TOP 20 CANCIONES ----------
 def top_20_canciones(spark):
     df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
-    top_tracks = (
-        df.groupBy("track_name")
-        .agg(count("*").alias("mentions"))
-        .orderBy(desc("mentions"))
-        .limit(20)
-    )
-    return top_tracks
+    total_users = df.select("user_id").distinct().count() or 1
+    top = (df.groupBy("track_name")
+             .agg(countDistinct("user_id").alias("users_count"))
+             .withColumn("percentage", lit(100.0) * col("users_count") / total_users)
+             .orderBy(desc("users_count"))
+             .limit(20))
+    return top
 
 
 # ---------- TOP 20 ÁLBUMES ----------
 def top_20_albumes(spark):
     df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_albums")
-    top_albums = (
-        df.groupBy("album_name")
-        .agg(count("*").alias("mentions"))
-        .orderBy(desc("mentions"))
-        .limit(20)
-    )
-    return top_albums
+    total_users = df.select("user_id").distinct().count() or 1
+    top = (df.groupBy("album_name")
+             .agg(countDistinct("user_id").alias("users_count"))
+             .withColumn("percentage", lit(100.0) * col("users_count") / total_users)
+             .orderBy(desc("users_count"))
+             .limit(20))
+    return top
 
 # ============================
 # GUARDAR EN MARIADB
