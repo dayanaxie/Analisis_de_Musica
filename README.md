@@ -119,9 +119,12 @@ The flow is as follows:
 | **View top artist chart** | `SELECT * FROM top_20_artists;` |
 | **View top tracks chart** | `SELECT * FROM top_20_tracks;` |
 | **View top albums chart** | `SELECT * FROM top_20_albums;` |
-| **View top albums chart** | `SELECT * FROM same_top1_artist;` |
-| **View top albums chart** | `SELECT * FROM artist_mention_stats;` |
-| **View top albums chart** | `SELECT * FROM long_tail_80;` |
+| **View top1 artist** | `SELECT * FROM same_top1_artist;` |
+| **View artist mention** | `SELECT * FROM artist_mention_stats;` |
+| **View long tail 80** | `SELECT * FROM long_tail_80;` |
+| **View data quality chart** | `SELECT * FROM data_quality;` |
+| **View outlier users chart** | `SELECT * FROM outlier_users;` |
+| **View low coverange artists chart** | `SELECT * FROM low_coverage_artists;` |
 | **Shut down containers and delete all data** | `docker compose down -v` ⚠️ |
 
 --- 
