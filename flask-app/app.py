@@ -113,6 +113,88 @@ def api_longtail():
     return jsonify(query_to_json(
         "SELECT total_artists, artists_in_tail, tail_percentage FROM long_tail_80"))
 
+# ---------- APIs de Conteos simples ----------
+
+@app.route("/api/items_por_usuario")
+def api_items_por_usuario():
+    artist_total_row = query_to_json("SELECT COUNT(*) AS n FROM user_artist_counts")
+    track_total_row  = query_to_json("SELECT COUNT(*) AS n FROM user_track_counts")
+    album_total_row  = query_to_json("SELECT COUNT(*) AS n FROM user_album_counts")
+
+    total_artistas = artist_total_row[0]["n"] if artist_total_row else 0
+    total_tracks   = track_total_row[0]["n"]  if track_total_row else 0
+    total_albums   = album_total_row[0]["n"]  if album_total_row else 0
+
+    artist_stats_rows = query_to_json("SELECT metric, value FROM user_artist_stats")
+    track_stats_rows  = query_to_json("SELECT metric, value FROM user_track_stats")
+    album_stats_rows  = query_to_json("SELECT metric, value FROM user_album_stats")
+
+    def extract_stats(label, total_users, rows):
+        mean = None
+        median = None
+        for r in rows:
+            metric = str(r["metric"]).strip().lower()
+            if metric == "mean":
+                mean = float(r["value"])
+            elif metric == "median":
+                median = float(r["value"])
+        return {
+            "item_type": label,
+            "total_usuarios": int(total_users),
+            "media": mean,
+            "mediana": median,
+        }
+
+    stats = [
+        extract_stats("artistas",  total_artistas, artist_stats_rows),
+        extract_stats("canciones", total_tracks,   track_stats_rows),
+        extract_stats("albumes",   total_albums,   album_stats_rows),
+    ]
+
+    return jsonify(stats)
+
+@app.route("/api/artistas_unicos")
+def api_artistas_unicos():
+    rows = query_to_json("""
+        SELECT unique_artists, unique_tracks, unique_albums
+        FROM unique_items
+        LIMIT 1
+    """)
+    return jsonify(rows[0] if rows else {})
+
+
+@app.route("/api/top3_identicas")
+def api_top3_identicas():
+    # Ya está limitado a top 3 combos en Spark, igual ordenamos por user_count
+    rows = query_to_json("""
+        SELECT top1, top2, top3, user_count
+        FROM users_same_top3_from_top10
+        ORDER BY user_count DESC
+    """)
+    return jsonify(rows)
+
+
+@app.route("/api/gustos_concentrados")
+def api_gustos_concentrados():
+    # Lista de usuarios
+    users = query_to_json("""
+        SELECT user_id, main_artist, track_count
+        FROM users_top5_single_artist
+        ORDER BY main_artist, user_id
+    """)
+
+    artists = query_to_json("""
+        SELECT main_artist, COUNT(*) AS user_count
+        FROM users_top5_single_artist
+        GROUP BY main_artist
+        ORDER BY user_count DESC
+        LIMIT 20
+    """)
+
+    return jsonify({
+        "users": users,
+        "artists": artists
+    })
 
 @app.route("/conteos")
 def conteos():

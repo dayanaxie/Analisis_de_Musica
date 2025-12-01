@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <title>Análisis de música – Conteos simples por usuario</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <!-- Chart.js para las gráficas -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -20,32 +22,261 @@
           <li><a href="{{ url_for('analysis_page') }}" class="tab-link">Análisis</a></li>
         </ul>
         <div class="sidebar-title">Visualizador</div>
-          <ul class="tab-list">
-            <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
-            <li><a href="{{ url_for('conteos') }}" class="tab-link active">Conteos simples por usuario</a></li>
-            <li><a href="{{ url_for('concurrencia') }}" class="tab-link">Concurrencia y posiciones</a></li>
-            <li><a href="{{ url_for('comparaciones') }}" class="tab-link">Comparaciones simples</a></li>
-            <li><a href="{{ url_for('calidad') }}" class="tab-link">Calidad</a></li>
-          </ul>
+        <ul class="tab-list">
+          <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
+          <li><a href="{{ url_for('conteos') }}" class="tab-link active">Conteos simples por usuario</a></li>
+          <li><a href="{{ url_for('concurrencia') }}" class="tab-link">Concurrencia y posiciones</a></li>
+          <li><a href="{{ url_for('comparaciones') }}" class="tab-link">Comparaciones simples</a></li>
+          <li><a href="{{ url_for('calidad') }}" class="tab-link">Calidad</a></li>
+        </ul>
       </aside>
 
       <main class="page-main">
+
+        <!-- 1. Items por usuario -->
         <section class="card">
           <div class="card-header">
             <div>
-              <h2 class="card-title">Conteos simples por usuario</h2>
+              <h2 class="card-title">Items por usuario</h2>
               <p class="card-subtitle">
-                Espacio para métricas básicas por usuario: reproducciones, sesiones, días activos, entre otros.
+                Artistas, canciones y álbumes distintos por usuario (Top 100 usuarios).
               </p>
             </div>
           </div>
 
-          <div class="page-empty">
-            Puedes utilizar este área para tablas de conteos, resúmenes por usuario y métricas descriptivas.
+          <!-- Resumen en 3 tarjetas pequeñas -->
+          <div class="metrics-row">
+            <div class="metric-card">
+              <div class="metric-label">Artistas distintos</div>
+              <div class="metric-value">
+                media <span id="artistsMean">-</span>
+              </div>
+              <div class="metric-subvalue">
+                mediana <span id="artistsMedian">-</span>
+              </div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-label">Canciones distintas</div>
+              <div class="metric-value">
+                media <span id="tracksMean">-</span>
+              </div>
+              <div class="metric-subvalue">
+                mediana <span id="tracksMedian">-</span>
+              </div>
+            </div>
+
+            <div class="metric-card">
+              <div class="metric-label">Álbumes distintos</div>
+              <div class="metric-value">
+                media <span id="albumsMean">-</span>
+              </div>
+              <div class="metric-subvalue">
+                mediana <span id="albumsMedian">-</span>
+              </div>
+            </div>
           </div>
+
+          <!-- Gráfica -->
+          <canvas id="chartItemsUsers" height="120"></canvas>
         </section>
+
+        <!-- 2. Artistas / ítems únicos -->
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Artistas, canciones y álbumes únicos</h2>
+              <p class="card-subtitle">
+                Conteo global de ítems distintos presentes en el dataset.
+              </p>
+            </div>
+          </div>
+          <canvas id="chartUniqueItems" height="120"></canvas>
+        </section>
+
+        <!-- 3. Usuarios con listas top-3 idénticas -->
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Top-3 de canciones idénticos</h2>
+              <p class="card-subtitle">
+                Combinaciones de top-3 de canciones que comparten varios usuarios (basado en top-10).
+              </p>
+            </div>
+          </div>
+
+          <canvas id="chartTop3" height="120"></canvas>
+        </section>
+
+        <!-- 4. Usuarios con gustos muy concentrados -->
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Usuarios con gustos muy concentrados</h2>
+              <p class="card-subtitle">
+                Cantidad de usuarios cuyo top 5 pertenece a un solo artista
+              </p>
+            </div>
+          </div>
+
+          <canvas id="chartConcentrated" height="120"></canvas>
+        </section>
+
       </main>
     </div>
   </div>
+
+  <script>
+    // ---------- helpers de gráficas (mismo estilo que popularidad) ----------
+    const bgColor = 'rgba(79, 70, 229, 0.55)';
+    const borderColor = 'rgba(79, 70, 229, 1)';
+    const font = { family: 'system-ui', size: 12 };
+
+    function horizontalBar(canvasId, labels, data) {
+      const barCount = labels.length;
+      const canvas = document.getElementById(canvasId);
+      if (!canvas) return;
+
+      canvas.height = Math.max(120, barCount * 18);
+
+      new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            backgroundColor: bgColor,
+            borderColor,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              ticks: { color: '#9ca3af', font: { size: 11 }, autoSkip: false },
+              grid: { display: false }
+            },
+            x: {
+              ticks: { color: '#9ca3af', font },
+              grid: { color: 'rgba(148,163,184,0.15)' }
+            }
+          }
+        }
+      });
+    }
+    console.log("ITEMS POR USUARIO")
+
+    // ---------- 1) Items por usuario ----------
+    fetch('/api/items_por_usuario')
+      .then(r => r.json())
+      .then(stats => {
+        // Filas de resumen por tipo de ítem
+        const artRow = stats.find(s => s.item_type === 'artistas')  || {};
+        const trkRow = stats.find(s => s.item_type === 'canciones') || {};
+        const albRow = stats.find(s => s.item_type === 'albumes')   || {};
+
+        // Resumen (media / mediana)
+        if (artRow.media   != null) document.getElementById('artistsMean').textContent   = Number(artRow.media).toFixed(1);
+        if (artRow.mediana != null) document.getElementById('artistsMedian').textContent = Number(artRow.mediana).toFixed(1);
+
+        if (trkRow.media   != null) document.getElementById('tracksMean').textContent    = Number(trkRow.media).toFixed(1);
+        if (trkRow.mediana != null) document.getElementById('tracksMedian').textContent  = Number(trkRow.mediana).toFixed(1);
+
+        if (albRow.media   != null) document.getElementById('albumsMean').textContent    = Number(albRow.media).toFixed(1);
+        if (albRow.mediana != null) document.getElementById('albumsMedian').textContent  = Number(albRow.mediana).toFixed(1);
+
+      })
+      .catch(err => console.error('Error items_por_usuario', err));
+    
+    console.log("ITEMS POR USUARIO")
+
+    // ---------- 2) Artistas / ítems únicos ----------
+    fetch('/api/artistas_unicos')
+      .then(r => r.json())
+      .then(row => {
+        if (!row || Object.keys(row).length === 0) return;
+        const ctx = document.getElementById('chartUniqueItems');
+        if (!ctx) return;
+
+        new Chart(ctx.getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: ['Artistas', 'Canciones', 'Álbumes'],
+            datasets: [{
+              data: [row.unique_artists, row.unique_tracks, row.unique_albums],
+              backgroundColor: bgColor,
+              borderColor,
+              borderWidth: 1
+            }]
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                ticks: { color: '#9ca3af', font },
+                grid: { display: false }
+              },
+              y: {
+                beginAtZero: true,
+                ticks: { color: '#9ca3af', font },
+                grid: { color: 'rgba(148,163,184,0.15)' }
+              }
+            }
+          }
+        });
+      })
+      .catch(err => console.error('Error artistas_unicos', err));
+
+    // ---------- 3) Top-3 idénticas ----------
+    fetch('/api/top3_identicas')
+      .then(r => r.json())
+      .then(rows => {
+
+        const labels = [];
+        const dataCounts = [];
+
+        rows.forEach(r => {
+          const combo = `${r.top1} / ${r.top2} / ${r.top3}`;
+          labels.push(combo);
+          dataCounts.push(r.user_count);
+
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${combo}</td>
+            <td>${r.user_count}</td>
+          `;
+        });
+
+        if (labels.length) horizontalBar('chartTop3', labels, dataCounts);
+      })
+      .catch(err => console.error('Error top3_identicas', err));
+
+    // ---------- 4) Gustos muy concentrados ----------
+    fetch('/api/gustos_concentrados')
+      .then(r => r.json())
+      .then(data => {
+        const users = data.users || [];
+        const artists = data.artists || [];
+
+        // Tabla de usuarios
+        users.forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${r.user_id}</td>
+            <td>${r.main_artist}</td>
+            <td>${r.track_count}</td>
+          `;
+        });
+
+        // Gráfica: artistas con más usuarios "concentrados"
+        const labels = artists.map(r => r.main_artist);
+        const dataCounts = artists.map(r => r.user_count);
+        if (labels.length) horizontalBar('chartConcentrated', labels, dataCounts);
+      })
+      .catch(err => console.error('Error gustos_concentrados', err));
+  </script>
 </body>
 </html>
+

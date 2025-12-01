@@ -2,7 +2,13 @@
 
 from pyspark.sql import SparkSession
 from pyspark.sql.window import Window
-from pyspark.sql.functions import col, desc, count, countDistinct, lit, row_number, sum as _sum, percent_rank
+from pyspark.sql.functions import (
+    col, desc, count, countDistinct, lit, row_number,
+    sum as _sum, percent_rank,
+    collect_list, sort_array, sha2, 
+    concat_ws, explode, first, avg,
+    max as Fmax, when         
+)
 import os
 
 # ============================
@@ -49,7 +55,7 @@ def create_spark_session(app_name="MusicAnalytics"):
 # ============================
 
 
-# ---------- TOP 20 ARTISTAS (CORREGIDO) ----------
+# ---------- TOP 20 ARTISTAS ----------
 def top_20_artistas(spark):
     df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
     total_users = df.select("user_id").distinct().count() or 1
@@ -134,6 +140,150 @@ def long_tail_80(spark):
         ["total_artists", "artists_in_tail", "tail_percentage"]
     )
 
+# ---------- Items por usuario ----------
+def estadisticas_items_por_usuario(spark, path, item_col, count_col_name):
+    df = spark.read.parquet(path)
+
+    # Conteo por usuario
+    counts = df.groupBy("user_id").agg(
+        countDistinct(item_col).alias(count_col_name)
+    )
+
+    # Media y mediana usando summary (mean, 50%)
+    stats = (
+        counts.select(count_col_name)
+        .summary("mean", "50%")
+        .withColumnRenamed("summary", "metric")
+        .withColumnRenamed(count_col_name, "value")
+    )
+    stats = stats.replace({"50%": "median"}, subset="metric")
+
+    return counts, stats
+
+
+def artistas_por_usuario_stats(spark):
+    return estadisticas_items_por_usuario(
+        spark,
+        f"{HDFS_PARQUET_BASE}/user_top_artists",
+        "artist_name",
+        "artist_count",
+    )
+
+
+def canciones_por_usuario_stats(spark):
+    return estadisticas_items_por_usuario(
+        spark,
+        f"{HDFS_PARQUET_BASE}/user_top_tracks",
+        "track_name",
+        "track_count",
+    )
+
+
+def albumes_por_usuario_stats(spark):
+    return estadisticas_items_por_usuario(
+        spark,
+        f"{HDFS_PARQUET_BASE}/user_top_albums",
+        "album_name",
+        "album_count",
+    )
+
+
+# ---------- Artistas únicos----------
+def conteo_items_unicos(spark):
+    df_art = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    df_track = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
+    df_album = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_albums")
+
+    total_artistas = df_art.select("artist_name").distinct().count()
+    total_canciones = df_track.select("track_name").distinct().count()
+    total_albumes = df_album.select("album_name").distinct().count()
+
+    return spark.createDataFrame(
+        [(total_artistas, total_canciones, total_albumes)],
+        ["unique_artists", "unique_tracks", "unique_albums"]
+    )
+
+# ---------- Usuarios con listas top-3 idénticas----------
+def usuarios_top3_identicos_desde_top10(spark):
+    # 1) Leemos el parquet de top tracks
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
+
+    # 2) Rankear canciones por usuario según playcount (más escuchada primero)
+    w_rank = Window.partitionBy("user_id").orderBy(desc("playcount"))
+    ranked = (
+        df.withColumn("rn", row_number().over(w_rank))
+          .filter(col("rn") <= 10)  
+    )
+
+    # 3) Pasar el ranking a columnas top1..top10 por usuario (sin arrays)
+    per_user = (
+        ranked.groupBy("user_id").agg(
+            Fmax(when(col("rn") == 1, col("track_name"))).alias("top1"),
+            Fmax(when(col("rn") == 2, col("track_name"))).alias("top2"),
+            Fmax(when(col("rn") == 3, col("track_name"))).alias("top3"),
+            Fmax(when(col("rn") == 4, col("track_name"))).alias("top4"),
+            Fmax(when(col("rn") == 5, col("track_name"))).alias("top5"),
+            Fmax(when(col("rn") == 6, col("track_name"))).alias("top6"),
+            Fmax(when(col("rn") == 7, col("track_name"))).alias("top7"),
+            Fmax(when(col("rn") == 8, col("track_name"))).alias("top8"),
+            Fmax(when(col("rn") == 9, col("track_name"))).alias("top9"),
+            Fmax(when(col("rn") == 10, col("track_name"))).alias("top10"),
+        )
+    )
+
+    # 4) Crear una firma string con el top-10 completo (en orden)
+    per_user = per_user.withColumn(
+        "top10_signature",
+        concat_ws(
+            " | ",
+            col("top1"), col("top2"), col("top3"),
+            col("top4"), col("top5"), col("top6"),
+            col("top7"), col("top8"), col("top9"),
+            col("top10")
+        )
+    )
+
+    # 5) Agrupar por firma de top-10 y contar usuarios
+    #    Nos quedamos con top1, top2, top3 y cuántos tienen ese mismo top-10.
+    duplicates = (
+        per_user.groupBy("top10_signature", "top1", "top2", "top3")
+                .agg(count("user_id").alias("user_count"))
+                .filter(col("user_count") > 1)     
+                .orderBy(desc("user_count"))
+                .limit(3)                         
+    )
+
+    # 6) Tabla final: solo las 3 canciones y la cantidad de usuarios
+    result = duplicates.select("top1", "top2", "top3", "user_count")
+
+    return result
+
+# ---------- Usuarios con gustos muy concentrados----------
+def usuarios_top5_mismo_artista(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
+
+    # Rankear canciones por usuario
+    w_rank = Window.partitionBy("user_id").orderBy(desc("playcount"))
+    ranked = df.withColumn("rn", row_number().over(w_rank)).filter(col("rn") <= 5)
+
+    # Agrupar por usuario para ver cuántos artistas distintos hay en su top-5
+    grouped = (
+        ranked.groupBy("user_id")
+              .agg(
+                  countDistinct("artist_name").alias("distinct_artists"),
+                  count("*").alias("track_count"),
+                  first("artist_name").alias("main_artist")
+              )
+    )
+
+    # Usuarios cuyo top-5 está 100% concentrado en un solo artista
+    concentrated = grouped.filter(
+        (col("track_count") == 5) & (col("distinct_artists") == 1)
+    ).select("user_id", "main_artist", "track_count")
+
+    return concentrated
+
+
 
 # ============================
 # GUARDAR EN MARIADB
@@ -149,6 +299,48 @@ def save_to_mysql(df, table_name):
         .mode("overwrite") \
         .save()
 
+
+# Conteos simples 
+def run_simple_counts_analysis(spark):
+
+    print("Calculando ítems por usuario (artistas) + media y mediana...")
+    user_artist_counts, user_artist_stats = artistas_por_usuario_stats(spark)
+    user_artist_counts.show()
+    user_artist_stats.show()
+    save_to_mysql(user_artist_counts, "user_artist_counts")
+    save_to_mysql(user_artist_stats, "user_artist_stats")
+
+    print("Calculando ítems por usuario (canciones) + media y mediana...")
+    user_track_counts, user_track_stats = canciones_por_usuario_stats(spark)
+    user_track_counts.show()
+    user_track_stats.show()
+    save_to_mysql(user_track_counts, "user_track_counts")
+    save_to_mysql(user_track_stats, "user_track_stats")
+
+    print("Calculando ítems por usuario (álbumes) + media y mediana...")
+    user_album_counts, user_album_stats = albumes_por_usuario_stats(spark)
+    user_album_counts.show()
+    user_album_stats.show()
+    save_to_mysql(user_album_counts, "user_album_counts")
+    save_to_mysql(user_album_stats, "user_album_stats")
+
+    print("Conteo total de artistas, canciones y álbumes únicos...")
+    unicos_df = conteo_items_unicos(spark)
+    unicos_df.show()
+    save_to_mysql(unicos_df, "unique_items")
+
+    print("Calculando usuarios con listas top-3 idénticas (basado en top-10 duplicado)...")
+    top3_same_from_top10 = usuarios_top3_identicos_desde_top10(spark)
+    top3_same_from_top10.show(truncate=False)
+    save_to_mysql(top3_same_from_top10, "users_same_top3_from_top10")
+
+
+    print("Buscando usuarios con top-5 de tracks en un solo artista...")
+    concentrated_users = usuarios_top5_mismo_artista(spark)
+    concentrated_users.show()
+    save_to_mysql(concentrated_users, "users_top5_single_artist")
+
+
 # ============================
 # FUNCIÓN PARA CORRER EL ANÁLISIS
 # ============================
@@ -159,39 +351,48 @@ def run_analysis(spark=None):
     if spark is None:
         spark = create_spark_session()
         created_here = True
+    try: 
 
-    print("Calculando Top 20 Artistas...")
-    top_artists = top_20_artistas(spark)
-    top_artists.show()
-    save_to_mysql(top_artists, "top_20_artists")
+        print("Calculando Top 20 Artistas...")
+        top_artists = top_20_artistas(spark)
+        top_artists.show()
+        save_to_mysql(top_artists, "top_20_artists")
 
-    print("Calculando Top 20 Canciones...")
-    top_tracks = top_20_canciones(spark)
-    top_tracks.show()
-    save_to_mysql(top_tracks, "top_20_tracks")
+        print("Calculando Top 20 Canciones...")
+        top_tracks = top_20_canciones(spark)
+        top_tracks.show()
+        save_to_mysql(top_tracks, "top_20_tracks")
 
-    print("Calculando Top 20 Álbumes...")
-    top_albums = top_20_albumes(spark)
-    top_albums.show()
-    save_to_mysql(top_albums, "top_20_albums")
+        print("Calculando Top 20 Álbumes...")
+        top_albums = top_20_albumes(spark)
+        top_albums.show()
+        save_to_mysql(top_albums, "top_20_albums")
 
-    print("Calculando usuarios que comparten el mismo artista #1...")
-    same_top1 = same_artista_numero1(spark)
-    same_top1.show()
-    save_to_mysql(same_top1, "same_top1_artist")
+        print("Calculando usuarios que comparten el mismo artista #1...")
+        same_top1 = same_artista_numero1(spark)
+        same_top1.show()
+        save_to_mysql(same_top1, "same_top1_artist")
 
-    print("Calculando estadísticos de menciones por artista...")
-    hist_stats = artist_mention_histogram(spark)
-    hist_stats.show()
-    save_to_mysql(hist_stats, "artist_mention_stats")
+        print("Calculando estadísticos de menciones por artista...")
+        hist_stats = artist_mention_histogram(spark)
+        hist_stats.show()
+        save_to_mysql(hist_stats, "artist_mention_stats")
 
-    print("Calculando long-tail 80 %...")
-    tail_df = long_tail_80(spark)
-    tail_df.show()
-    save_to_mysql(tail_df, "long_tail_80")
+        print("Calculando long-tail 80 %...")
+        tail_df = long_tail_80(spark)
+        tail_df.show()
+        save_to_mysql(tail_df, "long_tail_80")
 
-    if created_here:
-        spark.stop()
+        run_simple_counts_analysis(spark)
+        
+        spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty()
+    except Exception as e:
+        print(f"Error durante el análisis: {e}")
+        raise
+    finally:
+        # Solo cerrar Spark si lo creamos aquí
+        if created_here:
+            spark.stop()
 
     print("Análisis completado y guardado en MariaDB.")
 
