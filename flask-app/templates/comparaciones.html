@@ -86,7 +86,7 @@
           </div>
           <canvas id="chartArtistsDiversity" height="120"></canvas>
           <div class="page-empty" style="margin-top: 10px;">
-            Pase el mouse sobre las barras para ver también el número de canciones distintas.
+            Pase el mouse sobre las barras para ver también el número de usuarios distintos por artista.
           </div>
         </section>
       </main>
@@ -194,7 +194,7 @@
       /* 20. Artistas más diversos */
       if (diversity && diversity.length) {
         const labels = diversity.map(r => r.artist_name);
-        const data = diversity.map(r => r.distinct_users);
+        const data = diversity.map(r => r.distinct_tracks);
         horizontalBar('chartArtistsDiversity', labels, data, (ctx) => {
           const idx = ctx.dataIndex;
           const row = diversity[idx];
