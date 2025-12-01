@@ -2,10 +2,8 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.window import Window
 from pyspark.sql.functions import (
-    (
     col, desc, count, countDistinct, lit, row_number,
-    sum as _sum, isnan, when
-),
+    sum as _sum, isnan, 
     collect_list, sort_array, sha2, 
     concat_ws, explode, first, avg,
     max as Fmax, when         
@@ -405,20 +403,11 @@ def run_analysis(spark=None):
         spark = create_spark_session()
         created_here = True
     try: 
-
-<<<<<<< HEAD
+        # Metricas de Popularidad
         print("Calculando Top 20 Artistas...")
         top_artists = top_20_artistas(spark)
         top_artists.show()
         save_to_mysql(top_artists, "top_20_artists")
-=======
-
-    # Metricas de Popularidad
-    print("Calculando Top 20 Artistas...")
-    top_artists = top_20_artistas(spark)
-    top_artists.show()
-    save_to_mysql(top_artists, "top_20_artists")
->>>>>>> analytics-0
 
         print("Calculando Top 20 Canciones...")
         top_tracks = top_20_canciones(spark)
@@ -445,26 +434,25 @@ def run_analysis(spark=None):
         tail_df.show()
         save_to_mysql(tail_df, "long_tail_80")
 
-    # Metricas de calidad
-    print("Detectando datos faltantes / calidad...")
-    qual_df = missing_data_report(spark)
-    qual_df.show()
-    save_to_mysql(qual_df, "data_quality")
+        # Metricas de calidad
+        print("Detectando datos faltantes / calidad...")
+        qual_df = missing_data_report(spark)
+        qual_df.show()
+        save_to_mysql(qual_df, "data_quality")
 
-    print("Identificando usuarios atípicos (percentil 99)...")
-    out_df = extreme_users(spark)
-    out_df.show()
-    save_to_mysql(out_df, "outlier_users")
+        print("Identificando usuarios atípicos (percentil 99)...")
+        out_df = extreme_users(spark)
+        out_df.show()
+        save_to_mysql(out_df, "outlier_users")
 
-    print("Artistas con menos de 5 menciones...")
-    low_df = low_coverage_artists(spark)
-    low_df.show()
-    save_to_mysql(low_df, "low_coverage_artists")
+        print("Artistas con menos de 5 menciones...")
+        low_df = low_coverage_artists(spark)
+        low_df.show()
+        save_to_mysql(low_df, "low_coverage_artists")
 
-<<<<<<< HEAD
         run_simple_counts_analysis(spark)
-        
         spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty()
+        
     except Exception as e:
         print(f"Error durante el análisis: {e}")
         raise
@@ -472,26 +460,7 @@ def run_analysis(spark=None):
         # Solo cerrar Spark si lo creamos aquí
         if created_here:
             spark.stop()
-=======
-    # Metricas de calidad
-    print("Detectando datos faltantes / calidad...")
-    qual_df = missing_data_report(spark)
-    qual_df.show()
-    save_to_mysql(qual_df, "data_quality")
 
-    print("Identificando usuarios atípicos (percentil 99)...")
-    out_df = extreme_users(spark)
-    out_df.show()
-    save_to_mysql(out_df, "outlier_users")
-
-    print("Artistas con menos de 5 menciones...")
-    low_df = low_coverage_artists(spark)
-    low_df.show()
-    save_to_mysql(low_df, "low_coverage_artists")
-
-    if created_here:
-        spark.stop()
->>>>>>> analytics-0
 
     print("Análisis completado y guardado en MariaDB.")
 
