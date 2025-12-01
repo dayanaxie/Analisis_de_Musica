@@ -193,18 +193,23 @@
 
       /* 20. Artistas más diversos */
       if (diversity && diversity.length) {
-        const labels = diversity.map(r => r.artist_name);
-        const data = diversity.map(r => r.distinct_tracks);
+        // Ordenar por canciones distintas (descendente)
+        const sorted = [...diversity].sort(
+          (a, b) => b.distinct_tracks - a.distinct_tracks
+        );
+
+        const labels = sorted.map(r => r.artist_name);
+        const data   = sorted.map(r => r.distinct_tracks);
+
         horizontalBar('chartArtistsDiversity', labels, data, (ctx) => {
           const idx = ctx.dataIndex;
-          const row = diversity[idx];
+          const row = sorted[idx];
           return [
-            `Usuarios distintos: ${row.distinct_users}`,
-            `Canciones distintas: ${row.distinct_tracks}`
+            `Canciones distintas: ${row.distinct_tracks}`,
+            `Usuarios distintos: ${row.distinct_users}`
           ];
         });
       }
-
     }).catch(err => {
       console.error('Error cargando datos de comparaciones:', err);
     });
