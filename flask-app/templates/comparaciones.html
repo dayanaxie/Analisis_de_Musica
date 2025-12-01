@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>Análisis de música – Comparaciones simples</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -20,32 +21,193 @@
           <li><a href="{{ url_for('analysis_page') }}" class="tab-link">Análisis</a></li>
         </ul>
         <div class="sidebar-title">Visualizador</div>
-          <ul class="tab-list">
-            <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
-            <li><a href="{{ url_for('conteos') }}" class="tab-link">Conteos simples por usuario</a></li>
-            <li><a href="{{ url_for('concurrencia') }}" class="tab-link">Concurrencia y posiciones</a></li>
-            <li><a href="{{ url_for('comparaciones') }}" class="tab-link active">Comparaciones simples</a></li>
-            <li><a href="{{ url_for('calidad') }}" class="tab-link ">Calidad</a></li>
-          </ul>
+        <ul class="tab-list">
+          <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
+          <li><a href="{{ url_for('conteos') }}" class="tab-link">Conteos simples por usuario</a></li>
+          <li><a href="{{ url_for('concurrencia') }}" class="tab-link">Concurrencia y posiciones</a></li>
+          <li><a href="{{ url_for('comparaciones') }}" class="tab-link active">Comparaciones simples</a></li>
+          <li><a href="{{ url_for('calidad') }}" class="tab-link">Calidad</a></li>
+        </ul>
       </aside>
 
       <main class="page-main">
+        <!-- 18. Top artistas entre oyentes activos -->
         <section class="card">
           <div class="card-header">
             <div>
-              <h2 class="card-title">Comparaciones simples</h2>
+              <h2 class="card-title">Top artistas entre oyentes activos</h2>
               <p class="card-subtitle">
-                Sección para contrastar usuarios, artistas, listas o periodos de tiempo de forma directa.
+                Usuarios con más de 40 canciones registradas y los artistas que más se repiten entre ellos.
               </p>
             </div>
           </div>
+          <canvas id="chartActiveArtists" height="120"></canvas>
+        </section>
 
-          <div class="page-empty">
-            Puedes usar este panel para comparaciones lado a lado, tablas resumidas o indicadores clave.
+        <!-- 19. Popularidad cruzada artistas (tracks vs artists) -->
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Popularidad cruzada entre listas</h2>
+              <p class="card-subtitle">
+                Diferencia entre menciones del artista en la tabla de artistas vs la de canciones.
+              </p>
+            </div>
+          </div>
+          <canvas id="chartCrossPopularity" height="120"></canvas>
+
+          <div class="page-empty" style="margin-top: 10px;">
+            Tabla resumen (Top 10 diferencias):
+          </div>
+          <table style="width: 100%; margin-top: 8px; font-size: 0.85rem; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 1px solid rgba(148,163,184,0.4);">
+                <th style="text-align:left; padding: 4px 6px;">Artista</th>
+                <th style="text-align:right; padding: 4px 6px;"># en artistas</th>
+                <th style="text-align:right; padding: 4px 6px;"># en canciones</th>
+                <th style="text-align:right; padding: 4px 6px;">Diferencia</th>
+              </tr>
+            </thead>
+            <tbody id="tableCrossPopularity">
+              <!-- Rellenado por JS -->
+            </tbody>
+          </table>
+        </section>
+
+        <!-- 20. Artistas más diversos -->
+        <section class="card">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Artistas más diversos</h2>
+              <p class="card-subtitle">
+                Número de usuarios distintos y canciones distintas asociadas a cada artista.
+              </p>
+            </div>
+          </div>
+          <canvas id="chartArtistsDiversity" height="120"></canvas>
+          <div class="page-empty" style="margin-top: 10px;">
+            Pase el mouse sobre las barras para ver también el número de canciones distintas.
           </div>
         </section>
       </main>
     </div>
   </div>
+
+  <script>
+    /* ---------- Helpers de gráficos (similar a popularidad.html) ---------- */
+    const bgColor = 'rgba(79, 70, 229, 0.55)';
+    const borderColor = 'rgba(79, 70, 229, 1)';
+    const font = { family: 'system-ui', size: 12 };
+
+    function horizontalBar(canvasId, labels, data, tooltipFormatter) {
+      const barCount = labels.length;
+      const ctx = document.getElementById(canvasId);
+      ctx.height = Math.max(120, barCount * 18);
+
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            data,
+            backgroundColor: bgColor,
+            borderColor,
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: tooltipFormatter ? {
+                label: function(context) {
+                  return tooltipFormatter(context);
+                }
+              } : {}
+            }
+          },
+          scales: {
+            y: {
+              ticks: {
+                color: '#9ca3af',
+                font: { size: 11 },
+                autoSkip: false,
+                maxTicksLimit: barCount
+              },
+              grid: { display: false }
+            },
+            x: {
+              ticks: { color: '#9ca3af', font },
+              grid: { color: 'rgba(148,163,184,0.15)' }
+            }
+          }
+        }
+      });
+    }
+
+    /* ---------- Carga de datos para las 3 comparaciones ---------- */
+    Promise.all([
+      fetch('/api/top_artists_active_users').then(r => r.json()),
+      fetch('/api/cross_popularity').then(r => r.json()),
+      fetch('/api/artists_diversity').then(r => r.json())
+    ]).then(([activeArtists, crossPop, diversity]) => {
+
+      /* 18. Top artistas entre oyentes activos */
+      if (activeArtists && activeArtists.length) {
+        const labels = activeArtists.map(r => r.artist_name);
+        const data = activeArtists.map(r => r.active_users);
+        horizontalBar('chartActiveArtists', labels, data, (ctx) => {
+          const v = ctx.parsed.x;
+          return `Oyentes activos: ${v}`;
+        });
+      }
+
+      /* 19. Popularidad cruzada */
+      if (crossPop && crossPop.length) {
+        const labels = crossPop.map(r => r.artist_name);
+        const data = crossPop.map(r => r.difference);
+        horizontalBar('chartCrossPopularity', labels, data, (ctx) => {
+          const idx = ctx.dataIndex;
+          const row = crossPop[idx];
+          return [
+            `Dif: ${row.difference}`,
+            `En artistas: ${row.mentions_in_artists}`,
+            `En canciones: ${row.mentions_in_tracks}`
+          ];
+        });
+
+        // Rellenar tabla (Top 10)
+        const tbody = document.getElementById('tableCrossPopularity');
+        crossPop.slice(0, 10).forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td style="padding: 4px 6px;">${row.artist_name}</td>
+            <td style="padding: 4px 6px; text-align:right;">${row.mentions_in_artists}</td>
+            <td style="padding: 4px 6px; text-align:right;">${row.mentions_in_tracks}</td>
+            <td style="padding: 4px 6px; text-align:right;">${row.difference}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      /* 20. Artistas más diversos */
+      if (diversity && diversity.length) {
+        const labels = diversity.map(r => r.artist_name);
+        const data = diversity.map(r => r.distinct_users);
+        horizontalBar('chartArtistsDiversity', labels, data, (ctx) => {
+          const idx = ctx.dataIndex;
+          const row = diversity[idx];
+          return [
+            `Usuarios distintos: ${row.distinct_users}`,
+            `Canciones distintas: ${row.distinct_tracks}`
+          ];
+        });
+      }
+
+    }).catch(err => {
+      console.error('Error cargando datos de comparaciones:', err);
+    });
+  </script>
 </body>
 </html>

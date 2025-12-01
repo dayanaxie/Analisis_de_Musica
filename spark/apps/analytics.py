@@ -142,6 +142,10 @@ def long_tail_80(spark):
         ["total_artists", "artists_in_tail", "tail_percentage"]
     )
 
+#----------------------------------------------
+# Métricas de Conteos Simples por Usuario
+#----------------------------------------------
+
 # ---------- Items por usuario ----------
 def estadisticas_items_por_usuario(spark, path, item_col, count_col_name):
     df = spark.read.parquet(path)
@@ -285,6 +289,91 @@ def usuarios_top5_mismo_artista(spark):
 
     return concentrated
 
+#----------------------------------------------
+# Metricas de Comparaciones Simples
+#----------------------------------------------
+
+# ---------- Top Artistas entre Oyentes ----------
+def top_artistas_entre_oyentes_activos(spark):
+    # Leer tracks y artistas
+    df_tracks = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
+    df_artists = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+
+    # Usuarios con más de 40 canciones 
+    users_active = (
+        df_tracks.groupBy("user_id")
+                 .agg(count("*").alias("n_tracks"))
+                 .filter(col("n_tracks") > 40)
+                 .select("user_id")
+    )
+
+    filtered = df_artists.join(users_active, "user_id", "inner")
+
+    # Contar artistas entre oyentes activos
+    result = (
+        filtered.groupBy("artist_name")
+                .agg(countDistinct("user_id").alias("active_users"))
+                .orderBy(desc("active_users"))
+    )
+
+    return result
+
+# ---------- Popularidad cruzada entre listas ----------
+def popularidad_cruzada_artistas(spark):
+    df_artists = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    df_tracks = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
+
+    # Conteo en lista de artistas
+    art_counts = (
+        df_artists.groupBy("artist_name")
+                  .agg(count("*").alias("mentions_in_artists"))
+    )
+
+    # Conteo en lista de canciones
+    track_counts = (
+        df_tracks.groupBy("artist_name")
+                 .agg(count("*").alias("mentions_in_tracks"))
+    )
+
+    # Join de popularidad cruzada
+    joined = (
+        art_counts.join(track_counts, "artist_name", "outer")
+                  .fillna(0)
+                  .withColumn(
+                      "difference",
+                      col("mentions_in_tracks") - col("mentions_in_artists")
+                  )
+                  .orderBy(desc("difference"))
+    )
+
+    return joined
+
+
+# ---------- Artistas mas diversos ----------
+def artistas_mas_diversos(spark):
+    df_artists = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    df_tracks = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
+
+    # 1. Usuarios distintos por artista
+    user_div = (
+        df_artists.groupBy("artist_name")
+                  .agg(countDistinct("user_id").alias("distinct_users"))
+    )
+
+    # 2. Canciones distintas por artista
+    track_div = (
+        df_tracks.groupBy("artist_name")
+                 .agg(countDistinct("track_name").alias("distinct_tracks"))
+    )
+
+    # Unión final
+    result = (
+        user_div.join(track_div, "artist_name", "inner")
+                .orderBy(desc("distinct_users"), desc("distinct_tracks"))
+    )
+
+    return result
+
 
 #--------------------
 # Metricas de calidad
@@ -392,6 +481,25 @@ def run_simple_counts_analysis(spark):
     save_to_mysql(concentrated_users, "users_top5_single_artist")
 
 
+# Comparaciones simples 
+def run_simple_compare_analysis(spark):
+    print("Calculando Top artistas entre oyentes activos (>40 canciones)...")
+    res18 = top_artistas_entre_oyentes_activos(spark)
+    res18.show()
+    save_to_mysql(res18, "top_artists_active_users")
+
+    print("Calculando Popularidad cruzada artistas (tracks vs artists)...")
+    res19 = popularidad_cruzada_artistas(spark)
+    res19.show()
+    save_to_mysql(res19, "cross_popularity_artists")
+
+    print("Calculando artistas más diversos (usuarios y canciones)...")
+    res20 = artistas_mas_diversos(spark)
+    res20.show()
+    save_to_mysql(res20, "artists_diversity")
+
+
+
 # ============================
 # FUNCIÓN PARA CORRER EL ANÁLISIS
 # ============================
@@ -450,7 +558,11 @@ def run_analysis(spark=None):
         low_df.show()
         save_to_mysql(low_df, "low_coverage_artists")
 
+        # Metricas de conteos simples
         run_simple_counts_analysis(spark)
+        # Metricas de comparaciones simples
+        run_simple_compare_analysis(spark)
+
         spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty()
         
     except Exception as e:

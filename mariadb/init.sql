@@ -39,6 +39,39 @@ CREATE TABLE IF NOT EXISTS long_tail_80 (
     tail_percentage    DECIMAL(5,2)
 );
 
+-- =======
+-- Conteos simples
+-- =======
+
+CREATE TABLE IF NOT EXISTS user_artist_counts (
+    user_id      VARCHAR(50),
+    artist_count INT
+);
+
+CREATE TABLE IF NOT EXISTS user_track_counts (
+    user_id      VARCHAR(50),
+    track_count  INT
+);
+
+CREATE TABLE IF NOT EXISTS user_album_counts (
+    user_id      VARCHAR(50),
+    album_count  INT
+);
+
+CREATE TABLE IF NOT EXISTS user_artist_stats (
+    metric VARCHAR(20),         
+    value  DECIMAL(10,3)
+);
+
+CREATE TABLE IF NOT EXISTS user_track_stats (
+    metric VARCHAR(20),
+    value  DECIMAL(10,3)
+);
+
+CREATE TABLE IF NOT EXISTS user_album_stats (
+    metric VARCHAR(20),
+    value  DECIMAL(10,3)
+);
 
 -- =======
 -- Calidad
@@ -59,3 +92,25 @@ CREATE TABLE IF NOT EXISTS low_coverage_artists (
     artist_name  VARCHAR(150),
     mentions     INT
 ); 
+
+-- =======
+-- Comparaciones Simples
+-- =======
+
+CREATE TABLE IF NOT EXISTS top_artists_active_users (
+    artist_name VARCHAR(150),
+    active_users INT
+);
+
+CREATE TABLE IF NOT EXISTS cross_popularity_artists (
+    artist_name VARCHAR(150),
+    mentions_in_artists INT,
+    mentions_in_tracks  INT,
+    difference INT
+);
+
+CREATE TABLE IF NOT EXISTS artists_diversity (
+    artist_name VARCHAR(150),
+    distinct_users INT,
+    distinct_tracks INT
+);

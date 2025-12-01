@@ -209,6 +209,46 @@ def comparaciones():
     return render_template("comparaciones.html")
 
 
+# ---------- APIs de Comparaciones simples ----------
+
+@app.route("/api/top_artists_active_users")
+def api_top_artists_active_users():
+    rows = query_to_json("""
+        SELECT artist_name, active_users
+        FROM top_artists_active_users
+        ORDER BY active_users DESC
+        LIMIT 20
+    """)
+    return jsonify(rows)
+
+
+@app.route("/api/cross_popularity")
+def api_cross_popularity():
+    rows = query_to_json("""
+        SELECT artist_name,
+               mentions_in_artists,
+               mentions_in_tracks,
+               difference
+        FROM cross_popularity_artists
+        ORDER BY difference DESC
+        LIMIT 20
+    """)
+    return jsonify(rows)
+
+
+@app.route("/api/artists_diversity")
+def api_artists_diversity():
+    rows = query_to_json("""
+        SELECT artist_name,
+               distinct_users,
+               distinct_tracks
+        FROM artists_diversity
+        ORDER BY distinct_users DESC, distinct_tracks DESC
+        LIMIT 20
+    """)
+    return jsonify(rows)
+
+
 # ----------- CALIDAD ----------
 
 @app.route("/calidad")
