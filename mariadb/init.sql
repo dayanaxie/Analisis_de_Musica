@@ -38,3 +38,24 @@ CREATE TABLE IF NOT EXISTS long_tail_80 (
     artists_in_tail    INT,
     tail_percentage    DECIMAL(5,2)
 );
+
+
+-- =======
+-- Calidad
+-- =======
+
+CREATE TABLE IF NOT EXISTS data_quality (
+    problem          VARCHAR(50),
+    affected_users   INT
+);
+ 
+CREATE TABLE IF NOT EXISTS outlier_users (
+    user_id      VARCHAR(50),
+    items_count  INT,
+    percentile   DECIMAL(5,2)
+);
+ 
+CREATE TABLE IF NOT EXISTS low_coverage_artists (
+    artist_name  VARCHAR(150),
+    mentions     INT
+);

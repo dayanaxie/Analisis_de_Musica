@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-
 from pyspark.sql import SparkSession
 from pyspark.sql.window import Window
 from pyspark.sql.functions import (
+    (
     col, desc, count, countDistinct, lit, row_number,
-    sum as _sum, percent_rank,
+    sum as _sum, isnan, when
+),
     collect_list, sort_array, sha2, 
     concat_ws, explode, first, avg,
     max as Fmax, when         
@@ -54,6 +55,9 @@ def create_spark_session(app_name="MusicAnalytics"):
 # FUNCIONES DE ANÁLISIS
 # ============================
 
+#----------------------------------------------
+# Metricas de Popularidad y frecuencias básicas
+#----------------------------------------------
 
 # ---------- TOP 20 ARTISTAS ----------
 def top_20_artistas(spark):
@@ -284,6 +288,55 @@ def usuarios_top5_mismo_artista(spark):
     return concentrated
 
 
+#--------------------
+# Metricas de calidad
+# -------------------
+
+
+# ---------- DATOS FALTANTES ----------
+def missing_data_report(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    # usuarios con algún campo NULO o cadena vacía
+    null_users = (df.filter(
+        col("artist_name").isNull() |
+        (col("artist_name") == "") |
+        col("user_id").isNull()
+    ).select("user_id").distinct().count())
+
+    # usuarios con < 20 filas
+    user_counts = df.groupBy("user_id").count()
+    short_users = user_counts.filter("count < 20").count()
+
+    # DataFrame de dos filas
+    return spark.createDataFrame(
+        [("null_or_empty_field", null_users),
+         ("less_than_20_items", short_users)],
+        ["problem", "affected_users"]
+    )
+
+
+# ---------- USUARIOS ATÍPICOS (percentil 99) ----------
+def extreme_users(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    user_counts = df.groupBy("user_id").agg(count("*").alias("items_count"))
+    # percentil 99
+    p99 = user_counts.stat.approxQuantile("items_count", [0.99], 0)[0]
+    # extremos: muy altos o muy bajos (<= p1 o >= p99)
+    p1 = user_counts.stat.approxQuantile("items_count", [0.01], 0)[0]
+    outliers = user_counts.filter(
+        (col("items_count") >= p99) | (col("items_count") <= p1)
+    ).withColumn("percentile", when(col("items_count") >= p99, 99.0).otherwise(1.0))
+    return outliers
+
+
+# ---------- ARTISTAS CON < 5 MENCIONES ----------
+def low_coverage_artists(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    mentions = df.groupBy("artist_name").agg(count("*").alias("mentions"))
+    low = mentions.filter("mentions < 5").orderBy("mentions", "artist_name")
+    return low
+
+
 
 # ============================
 # GUARDAR EN MARIADB
@@ -353,10 +406,19 @@ def run_analysis(spark=None):
         created_here = True
     try: 
 
+<<<<<<< HEAD
         print("Calculando Top 20 Artistas...")
         top_artists = top_20_artistas(spark)
         top_artists.show()
         save_to_mysql(top_artists, "top_20_artists")
+=======
+
+    # Metricas de Popularidad
+    print("Calculando Top 20 Artistas...")
+    top_artists = top_20_artistas(spark)
+    top_artists.show()
+    save_to_mysql(top_artists, "top_20_artists")
+>>>>>>> analytics-0
 
         print("Calculando Top 20 Canciones...")
         top_tracks = top_20_canciones(spark)
@@ -383,6 +445,23 @@ def run_analysis(spark=None):
         tail_df.show()
         save_to_mysql(tail_df, "long_tail_80")
 
+    # Metricas de calidad
+    print("Detectando datos faltantes / calidad...")
+    qual_df = missing_data_report(spark)
+    qual_df.show()
+    save_to_mysql(qual_df, "data_quality")
+
+    print("Identificando usuarios atípicos (percentil 99)...")
+    out_df = extreme_users(spark)
+    out_df.show()
+    save_to_mysql(out_df, "outlier_users")
+
+    print("Artistas con menos de 5 menciones...")
+    low_df = low_coverage_artists(spark)
+    low_df.show()
+    save_to_mysql(low_df, "low_coverage_artists")
+
+<<<<<<< HEAD
         run_simple_counts_analysis(spark)
         
         spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty()
@@ -393,6 +472,26 @@ def run_analysis(spark=None):
         # Solo cerrar Spark si lo creamos aquí
         if created_here:
             spark.stop()
+=======
+    # Metricas de calidad
+    print("Detectando datos faltantes / calidad...")
+    qual_df = missing_data_report(spark)
+    qual_df.show()
+    save_to_mysql(qual_df, "data_quality")
+
+    print("Identificando usuarios atípicos (percentil 99)...")
+    out_df = extreme_users(spark)
+    out_df.show()
+    save_to_mysql(out_df, "outlier_users")
+
+    print("Artistas con menos de 5 menciones...")
+    low_df = low_coverage_artists(spark)
+    low_df.show()
+    save_to_mysql(low_df, "low_coverage_artists")
+
+    if created_here:
+        spark.stop()
+>>>>>>> analytics-0
 
     print("Análisis completado y guardado en MariaDB.")
 
