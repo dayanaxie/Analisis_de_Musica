@@ -208,9 +208,67 @@ def concurrencia():
 def comparaciones():
     return render_template("comparaciones.html")
 
+
+# ----------- CALIDAD ----------
+
 @app.route("/calidad")
 def calidad():
     return render_template("calidad.html")
+
+@app.route("/api/data_quality")
+def api_data_quality():
+    rows = query_to_json("SELECT SUM(affected_users) AS total FROM data_quality")
+    return jsonify({"total": int(rows[0]["total"]) if rows else 0})
+
+# @app.route("/api/outliers_summary")
+# def api_outliers_summary():
+    # total = query_to_json("SELECT COUNT(*) AS total FROM outlier_users")[0]["total"]
+    # sample = query_to_json("""
+    #     SELECT user_id, items_count, percentile
+    #     FROM outlier_users
+    #     LIMIT 10
+    # """)
+    # for u in sample:
+    #     u["user_id"] = u["user_id"][:6] + "…"
+    # return jsonify({"total": int(total), "sample": sample})
+
+@app.route("/api/outliers_summary")
+def api_outliers_summary():
+    try:
+        total_row = query_to_json("SELECT COUNT(*) AS total FROM outlier_users")
+        total = int(total_row[0]["total"]) if total_row else 0
+
+        sample_rows = query_to_json("""
+            SELECT user_id, items_count, percentile
+            FROM outlier_users
+            LIMIT 10
+        """)
+
+        for u in sample_rows:
+            user_id = u.get("user_id", "")
+            user_id_str = str(user_id)
+            u["user_id"] = user_id_str[:6] + "…" if len(user_id_str) > 6 else user_id_str
+
+        return jsonify({"total": total, "sample": sample_rows})
+
+    except Exception as e:
+        import traceback
+        return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
+
+
+@app.route("/api/low_coverage_summary")
+def api_low_coverage_summary():
+    total = query_to_json("SELECT COUNT(*) AS total FROM low_coverage_artists")[0]["total"]
+    sample = query_to_json("""
+        SELECT artist_name, mentions
+        FROM low_coverage_artists
+        ORDER BY mentions ASC, artist_name
+        LIMIT 10
+    """)
+    return jsonify({"total": int(total), "sample": sample})
+
+
+# ----------- ANALYSIS ---------- 
 
 @app.route("/analysis")
 def analysis_page():

@@ -1,52 +1,186 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <title>Análisis de música – Calidad</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-</head>
-<body>
-  <div class="app">
-    <header class="app-header">
-      <h1 class="app-title">Análisis de música</h1>
-      <p class="app-subtitle">Panel para explorar métricas y comportamiento de escucha.</p>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Análisis de música – Calidad</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='styles.css') }}"
+    />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <h1 class="app-title">Análisis de música</h1>
+        <p class="app-subtitle">
+          Panel para explorar métricas y comportamiento de escucha.
+        </p>
+      </header>
 
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="sidebar-title">Preprocesamiento</div>
-        <ul class="tab-list">
-          <li><a href="{{ url_for('loader') }}" class="tab-link">Loader</a></li>
-          <li><a href="{{ url_for('analysis_page') }}" class="tab-link">Análisis</a></li>
-        </ul>
-        <div class="sidebar-title">Visualizador</div>
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="sidebar-title">Preprocesamiento</div>
           <ul class="tab-list">
-            <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
-            <li><a href="{{ url_for('conteos') }}" class="tab-link">Conteos simples por usuario</a></li>
-            <li><a href="{{ url_for('concurrencia') }}" class="tab-link">Concurrencia y posiciones</a></li>
-            <li><a href="{{ url_for('comparaciones') }}" class="tab-link">Comparaciones simples</a></li>
-            <li><a href="{{ url_for('calidad') }}" class="tab-link active">Calidad</a></li>
+            <li>
+              <a href="{{ url_for('loader') }}" class="tab-link">Loader</a>
+            </li>
+            <li>
+              <a href="{{ url_for('analysis_page') }}" class="tab-link"
+                >Análisis</a
+              >
+            </li>
           </ul>
+          <div class="sidebar-title">Visualizador</div>
+          <ul class="tab-list">
+            <li>
+              <a href="{{ url_for('popularidad') }}" class="tab-link"
+                >Popularidad y frecuencias</a
+              >
+            </li>
+            <li>
+              <a href="{{ url_for('conteos') }}" class="tab-link"
+                >Conteos simples por usuario</a
+              >
+            </li>
+            <li>
+              <a href="{{ url_for('concurrencia') }}" class="tab-link"
+                >Concurrencia y posiciones</a
+              >
+            </li>
+            <li>
+              <a href="{{ url_for('comparaciones') }}" class="tab-link"
+                >Comparaciones simples</a
+              >
+            </li>
+            <li>
+              <a href="{{ url_for('calidad') }}" class="tab-link active"
+                >Calidad</a
+              >
+            </li>
+          </ul>
+        </aside>
 
-      </aside>
-
-      <main class="page-main">
-        <section class="card">
-          <div class="card-header">
-            <div>
-              <h2 class="card-title">Calidad</h2>
-              <p class="card-subtitle">
-                Apartado destinado a métricas de calidad de datos, cobertura y consistencia del dataset.
-              </p>
+        <main class="page-main">
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2 class="card-title">Calidad de Datos</h2>
+                <p class="card-subtitle">
+                  Validaciones, cobertura, outliers y consistencia del dataset.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div class="page-empty">
-            Aquí puedes reportar validaciones, porcentajes de datos completos, outliers y cualquier indicador de calidad.
-          </div>
-        </section>
-      </main>
+            <!-- Métricas generales -->
+            <div class="metrics-row" id="metrics-container">
+              <div class="metric-card">
+                <div class="metric-label">Datos faltantes</div>
+                <div class="metric-value" id="missing-count">-</div>
+                <div class="metric-subvalue">usuarios afectados</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Usuarios atípicos</div>
+                <div class="metric-value" id="outliers-count">-</div>
+                <div class="metric-subvalue">percentil 99</div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-label">Artistas con baja cobertura</div>
+                <div class="metric-value" id="low-coverage-count">-</div>
+                <div class="metric-subvalue">&lt; 5 menciones</div>
+              </div>
+            </div>
+
+            <!-- Tabla de usuarios atípicos -->
+            <h3 style="margin-top: 2rem; font-size: 1rem">
+              Usuarios atípicos (muestra)
+            </h3>
+            <table
+              style="width: 100%; margin-top: 0.5rem; font-size: 0.9rem"
+              id="outliers-table"
+            >
+              <thead>
+                <tr>
+                  <th style="text-align: left">Usuario</th>
+                  <th style="text-align: right">Ítems</th>
+                  <th style="text-align: right">Percentil</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+
+            <!-- Tabla de artistas con baja cobertura -->
+            <h3 style="margin-top: 2rem; font-size: 1rem">
+              Artistas con baja cobertura (muestra)
+            </h3>
+            <table
+              style="width: 100%; margin-top: 0.5rem; font-size: 0.9rem"
+              id="low-coverage-table"
+            >
+              <thead>
+                <tr>
+                  <th style="text-align: left">Artista</th>
+                  <th style="text-align: right">Menciones</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </section>
+        </main>
+      </div>
     </div>
-  </div>
-</body>
+
+    <script>
+      async function loadQualityMetrics() {
+        try {
+          // Métricas generales
+          const missing = await fetch("/api/data_quality").then((res) =>
+            res.json()
+          );
+          const outliers = await fetch("/api/outliers_summary").then((res) =>
+            res.json()
+          );
+          const lowCoverage = await fetch("/api/low_coverage_summary").then(
+            (res) => res.json()
+          );
+
+          document.getElementById("missing-count").textContent = missing.total;
+          document.getElementById("outliers-count").textContent =
+            outliers.total;
+          document.getElementById("low-coverage-count").textContent =
+            lowCoverage.total;
+
+          // Tabla de usuarios atípicos
+          const outliersTable = document.querySelector("#outliers-table tbody");
+          outliersTable.innerHTML = outliers.sample
+            .map(
+              (u) => `
+          <tr>
+            <td>${u.user_id}</td>
+            <td style="text-align: right;">${u.items_count}</td>
+            <td style="text-align: right;">${u.percentile}</td>
+          </tr>
+        `
+            )
+            .join("");
+
+          // Tabla de artistas con baja cobertura
+          const lowTable = document.querySelector("#low-coverage-table tbody");
+          lowTable.innerHTML = lowCoverage.sample
+            .map(
+              (a) => `
+          <tr>
+            <td>${a.artist_name}</td>
+            <td style="text-align: right;">${a.mentions}</td>
+          </tr>
+        `
+            )
+            .join("");
+        } catch (err) {
+          console.error("Error cargando métricas de calidad:", err);
+        }
+      }
+
+      loadQualityMetrics();
+    </script>
+  </body>
 </html>

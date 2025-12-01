@@ -58,4 +58,4 @@ CREATE TABLE IF NOT EXISTS outlier_users (
 CREATE TABLE IF NOT EXISTS low_coverage_artists (
     artist_name  VARCHAR(150),
     mentions     INT
-);
+); 
