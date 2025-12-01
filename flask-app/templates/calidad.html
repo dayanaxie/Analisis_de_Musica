@@ -90,6 +90,46 @@
               </div>
             </div>
 
+            <div style="margin-top: 1rem; font-size: 0.9rem">
+              <label for="sample-size" style="color: var(--text-muted)"
+                >Tamaño de muestra:</label
+              >
+              <select
+                id="sample-size"
+                onchange="loadQualityMetrics()"
+                style="
+                  background: rgba(15, 23, 42, 0.9);
+                  color: var(--text-main);
+                  border: 1px solid var(--border-subtle);
+                  border-radius: 8px;
+                  padding: 6px 10px;
+                  font-size: 0.9rem;
+                  margin-left: 8px;
+                  cursor: pointer;
+                  transition: border-color 0.2s ease;
+                "
+                onfocus="this.style.borderColor='var(--accent-strong)'"
+                onblur="this.style.borderColor='var(--border-subtle)'"
+              >
+                <option value="10">10</option>
+                <option value="15">15</option>
+                <option value="25">25</option>
+                <option value="35">35</option>
+                <option value="50">50</option>
+                <option value="1000">1000</option>
+              </select>
+              <div
+                style="
+                  margin-bottom: 1rem;
+                  font-size: 0.85rem;
+                  color: var(--text-muted);
+                "
+              >
+                Mostrando <strong id="sample-count">10</strong> de
+                <strong id="population-count">-</strong> usuarios y <strong id="low-coverage-count2">-</strong> artistas.
+              </div>
+            </div>
+
             <!-- Tabla de usuarios atípicos -->
             <h3 style="margin-top: 2rem; font-size: 1rem">
               Usuarios atípicos (muestra)
@@ -131,35 +171,44 @@
 
     <script>
       async function loadQualityMetrics() {
+        const sampleSize = document.getElementById("sample-size")?.value || 10;
+
         try {
           // Métricas generales
           const missing = await fetch("/api/data_quality").then((res) =>
             res.json()
           );
-          const outliers = await fetch("/api/outliers_summary").then((res) =>
-            res.json()
-          );
-          const lowCoverage = await fetch("/api/low_coverage_summary").then(
-            (res) => res.json()
-          );
+          const outliers = await fetch(
+            `/api/outliers_summary?limit=${sampleSize}`
+          ).then((res) => res.json());
+          const lowCoverage = await fetch(
+            `/api/low_coverage_summary?limit=${sampleSize}`
+          ).then((res) => res.json());
 
           document.getElementById("missing-count").textContent = missing.total;
           document.getElementById("outliers-count").textContent =
-            outliers.total;
+            outliers.total_population;
           document.getElementById("low-coverage-count").textContent =
-            lowCoverage.total;
+            lowCoverage.total_population;
+
+          document.getElementById("sample-count").textContent =
+            outliers.sample_size;
+          document.getElementById("population-count").textContent =
+            outliers.total_population;
+          document.getElementById("low-coverage-count2").textContent =
+            lowCoverage.total_population;
 
           // Tabla de usuarios atípicos
           const outliersTable = document.querySelector("#outliers-table tbody");
           outliersTable.innerHTML = outliers.sample
             .map(
               (u) => `
-          <tr>
-            <td>${u.user_id}</td>
-            <td style="text-align: right;">${u.items_count}</td>
-            <td style="text-align: right;">${u.percentile}</td>
-          </tr>
-        `
+            <tr>
+              <td>${u.user_id}</td>
+              <td style="text-align: right;">${u.items_count}</td>
+              <td style="text-align: right;">${u.percentile}</td>
+            </tr>
+          `
             )
             .join("");
 
@@ -168,11 +217,11 @@
           lowTable.innerHTML = lowCoverage.sample
             .map(
               (a) => `
-          <tr>
-            <td>${a.artist_name}</td>
-            <td style="text-align: right;">${a.mentions}</td>
-          </tr>
-        `
+            <tr>
+              <td>${a.artist_name}</td>
+              <td style="text-align: right;">${a.mentions}</td>
+            </tr>
+          `
             )
             .join("");
         } catch (err) {
