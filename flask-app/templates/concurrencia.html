@@ -2,50 +2,138 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Análisis de música – Concurrencia y posiciones</title>
+  <title>Análisis de Música - Concurrencia</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-  <div class="app">
-    <header class="app-header">
-      <h1 class="app-title">Análisis de música</h1>
-      <p class="app-subtitle">Panel para explorar métricas y comportamiento de escucha.</p>
-    </header>
+<div class="app">
 
-    <div class="app-shell">
-      <aside class="sidebar">
-        <div class="sidebar-title">Preprocesamiento</div>
-        <ul class="tab-list">
-          <li><a href="{{ url_for('loader') }}" class="tab-link">Loader</a></li>
-          <li><a href="{{ url_for('analysis_page') }}" class="tab-link">Análisis</a></li>
-        </ul>
-        <div class="sidebar-title">Visualizador</div>
-          <ul class="tab-list">
-            <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
-            <li><a href="{{ url_for('conteos') }}" class="tab-link">Conteos simples por usuario</a></li>
-            <li><a href="{{ url_for('concurrencia') }}" class="tab-link active">Concurrencia y posiciones</a></li>
-            <li><a href="{{ url_for('comparaciones') }}" class="tab-link">Comparaciones simples</a></li>
-            <li><a href="{{ url_for('calidad') }}" class="tab-link">Calidad</a></li>
-          </ul>
-      </aside>
+  <header class="app-header">
+    <h1 class="app-title">Concurrencia</h1>
+    <p class="app-subtitle">Patrones de coocurrencia, posiciones globales y solapamientos entre artistas y canciones.</p>
+  </header>
 
-      <main class="page-main">
-        <section class="card">
-          <div class="card-header">
-            <div>
-              <h2 class="card-title">Concurrencia y posiciones</h2>
-              <p class="card-subtitle">
-                Reserva este espacio para análisis temporales, concurrencia y posiciones en rankings.
-              </p>
-            </div>
-          </div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="sidebar-title">Preprocesamiento</div>
+      <ul class="tab-list">
+        <li><a href="{{ url_for('loader') }}" class="tab-link">Loader</a></li>
+        <li><a href="{{ url_for('analysis_page') }}" class="tab-link">Análisis</a></li>
+      </ul>
 
-          <div class="page-empty">
-            Aquí puedes incorporar curvas de concurrencia, líneas de tiempo y cambios de posición a lo largo del tiempo.
-          </div>
-        </section>
-      </main>
-    </div>
+      <div class="sidebar-title">Visualizador</div>
+      <ul class="tab-list">
+        <li><a href="{{ url_for('popularidad') }}" class="tab-link">Popularidad y frecuencias</a></li>
+        <li><a href="{{ url_for('conteos') }}" class="tab-link">Conteos simples</a></li>
+        <li><a href="{{ url_for('concurrencia') }}" class="tab-link active">Concurrencia</a></li>
+        <li><a href="{{ url_for('comparaciones') }}" class="tab-link">Comparaciones</a></li>
+        <li><a href="{{ url_for('calidad') }}" class="tab-link">Calidad</a></li>
+      </ul>
+    </aside>
+
+    <main class="page-main">
+
+      <!-- Métrica 11 -->
+      <section class="card">
+        <h2 class="card-title">Top 50 Pares de Artistas</h2>
+        <table id="tabla-pares" class="simple-table"></table>
+      </section>
+
+      <!-- Métrica 12 -->
+      <section class="card">
+        <h2 class="card-title">Top 50 Tripletas de Artistas</h2>
+        <table id="tabla-tripletas" class="simple-table"></table>
+      </section>
+
+      <!-- Métrica 13 -->
+      <section class="card">
+        <h2 class="card-title">Solapamiento Artista–Canción</h2>
+        <table id="tabla-overlap" class="simple-table"></table>
+      </section>
+
+      <!-- Métrica 14 -->
+      <section class="card">
+        <h2 class="card-title">Posición Promedio por Artista</h2>
+        <table id="tabla-posicion" class="simple-table"></table>
+      </section>
+
+      <!-- Métrica 15 -->
+      <section class="card">
+        <h2 class="card-title">#1 en Top 5 Global</h2>
+        <table id="tabla-top1top5" class="simple-table"></table>
+      </section>
+
+      <!-- Métrica 16 -->
+      <section class="card">
+        <h2 class="card-title">Estabilidad de Posiciones (#1 y #2)</h2>
+        <table id="tabla-estabilidad" class="simple-table"></table>
+      </section>
+
+    </main>
   </div>
+</div>
+
+<script>
+function loadTable(id, apiUrl, columns) {
+  fetch(apiUrl)
+    .then(r => r.json())
+    .then(data => {
+      const table = document.getElementById(id);
+      let html = "<thead><tr>";
+
+      columns.forEach(c => html += `<th>${c.header}</th>`);
+      html += "</tr></thead><tbody>";
+
+      if (!Array.isArray(data)) data = [data];
+
+      data.forEach(row => {
+        html += "<tr>";
+        columns.forEach(c => html += `<td>${row[c.field]}</td>`);
+        html += "</tr>";
+      });
+
+      html += "</tbody>";
+      table.innerHTML = html;
+    });
+}
+
+loadTable("tabla-pares", "/api/concurrencia/pares", [
+  { header: "Artista 1", field: "artist1" },
+  { header: "Artista 2", field: "artist2" },
+  { header: "Frecuencia", field: "pair_count" }
+]);
+
+loadTable("tabla-tripletas", "/api/concurrencia/tripletas", [
+  { header: "Artista 1", field: "artist1" },
+  { header: "Artista 2", field: "artist2" },
+  { header: "Artista 3", field: "artist3" },
+  { header: "Frecuencia", field: "triplet_count" }
+]);
+
+loadTable("tabla-overlap", "/api/concurrencia/overlap", [
+  { header: "Solapamientos", field: "overlap_count" },
+  { header: "Total usuarios", field: "total_users" },
+  { header: "Proporción", field: "overlap_ratio" }
+]);
+
+loadTable("tabla-posicion", "/api/concurrencia/posicion_promedio", [
+  { header: "Artista", field: "artist_name" },
+  { header: "Posición promedio", field: "avg_position" },
+  { header: "Usuarios", field: "user_count" }
+]);
+
+loadTable("tabla-top1top5", "/api/concurrencia/top1_en_top5", [
+  { header: "Usuarios coincidentes", field: "matched_users" },
+  { header: "Total usuarios", field: "total_users" },
+  { header: "Proporción", field: "ratio" }
+]);
+
+loadTable("tabla-estabilidad", "/api/concurrencia/estabilidad", [
+  { header: "Usuarios estables", field: "stable_users" },
+  { header: "Total usuarios", field: "total_users" },
+  { header: "Proporción", field: "ratio" }
+]);
+</script>
+
 </body>
 </html>

@@ -311,15 +311,77 @@ def api_low_coverage_summary():
         import traceback
         return jsonify({"error": str(e), "trace": traceback.format_exc()}), 500
 
+
+# ----------- CONCURRENCIA ----------
+
+@app.route("/api/concurrencia/pares")
+def api_concurrencia_pares():
+    rows = query_to_json("""
+        SELECT artist1, artist2, pair_count
+        FROM top_50_artist_pairs
+        ORDER BY pair_count DESC
+        LIMIT 50
+    """)
+    return jsonify(rows)
+
+
+@app.route("/api/concurrencia/tripletas")
+def api_concurrencia_tripletas():
+    rows = query_to_json("""
+        SELECT artist1, artist2, artist3, triplet_count
+        FROM top_50_artist_triplets
+        ORDER BY triplet_count DESC
+        LIMIT 50
+    """)
+    return jsonify(rows)
+
+
+@app.route("/api/concurrencia/overlap")
+def api_concurrencia_overlap():
+    row = query_to_json("""
+        SELECT overlap_count, total_users, overlap_ratio
+        FROM artist_track_overlap
+        LIMIT 1
+    """)
+    return jsonify(row[0] if row else {})
+
+
+@app.route("/api/concurrencia/posicion_promedio")
+def api_concurrencia_posicion_promedio():
+    rows = query_to_json("""
+        SELECT artist_name, avg_position, user_count
+        FROM artist_average_position
+        ORDER BY avg_position ASC
+        LIMIT 200
+    """)
+    return jsonify(rows)
+
+
+@app.route("/api/concurrencia/top1_en_top5")
+def api_concurrencia_top1_en_top5():
+    row = query_to_json("""
+        SELECT matched_users, total_users, ratio
+        FROM top1_in_global_top5_frequency
+        LIMIT 1
+    """)
+    return jsonify(row[0] if row else {})
+
+
+@app.route("/api/concurrencia/estabilidad")
+def api_concurrencia_estabilidad():
+    row = query_to_json("""
+        SELECT stable_users, total_users, ratio
+        FROM position_stability_users
+        LIMIT 1
+    """)
+    return jsonify(row[0] if row else {})
+
+
 # ----------- ANALYSIS ---------- 
 
 @app.route("/analysis")
 def analysis_page():
     return render_template("analysis.html")
-
-
-
-
 
 @app.route("/admin/load-data", methods=["POST"])
 def trigger_loader():

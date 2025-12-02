@@ -114,3 +114,46 @@ CREATE TABLE IF NOT EXISTS artists_diversity (
     distinct_users INT,
     distinct_tracks INT
 );
+
+
+
+-- =======
+-- Concurrencia
+-- =======
+
+CREATE TABLE IF NOT EXISTS top_50_artist_pairs (
+    artist1     VARCHAR(150),
+    artist2     VARCHAR(150),
+    pair_count  INT
+);
+
+CREATE TABLE IF NOT EXISTS top_50_artist_triplets (
+    artist1        VARCHAR(150),
+    artist2        VARCHAR(150),
+    artist3        VARCHAR(150),
+    triplet_count  INT
+);
+
+CREATE TABLE IF NOT EXISTS artist_track_overlap (
+    overlap_count  INT,
+    total_users    INT,
+    overlap_ratio  DECIMAL(6,4)
+);
+
+CREATE TABLE IF NOT EXISTS artist_average_position (
+    artist_name  VARCHAR(150),
+    avg_position DECIMAL(10,3),
+    user_count   INT
+);
+
+CREATE TABLE IF NOT EXISTS top1_in_global_top5_frequency (
+    matched_users  INT,
+    total_users    INT,
+    ratio          DECIMAL(6,4)
+);
+
+CREATE TABLE IF NOT EXISTS position_stability_users (
+    stable_users  INT,
+    total_users   INT,
+    ratio         DECIMAL(6,4)
+);

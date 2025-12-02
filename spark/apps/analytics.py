@@ -3,11 +3,13 @@ from pyspark.sql import SparkSession
 from pyspark.sql.window import Window
 from pyspark.sql.functions import (
     col, desc, count, countDistinct, lit, row_number,
-    sum as _sum, isnan, 
+    sum as _sum, isnan, udf,
     collect_list, sort_array, sha2, 
-    concat_ws, explode, first, avg,
+    concat_ws, explode, first, avg, split,
     max as Fmax, when         
 )
+from pyspark.sql.types import ArrayType, StringType
+from itertools import combinations
 import os
 
 # ============================
@@ -424,6 +426,228 @@ def low_coverage_artists(spark):
     return low
 
 
+#--------------------
+# Métricas de concurrencia
+# -------------------
+
+
+# ---------- PARES DE ARTISTAS MAS FRECUENTES ----------
+def artist_pairs_udf(artists):
+    if not artists:
+        return []
+    seen = list(dict.fromkeys(artists))
+    pairs = []
+    for a, b in combinations(seen, 2):
+        if a is None or b is None:
+            continue
+        x, y = sorted([a, b])
+        pairs.append(f"{x}|||{y}")
+    return pairs
+
+artist_pairs_spark_udf = udf(artist_pairs_udf, ArrayType(StringType()))
+
+def top_50_artist_pairs(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+
+    per_user = df.groupBy("user_id").agg(
+        collect_list("artist_name").alias("artists")
+    )
+
+    pairs = (
+        per_user
+        .select(explode(artist_pairs_spark_udf("artists")).alias("pair"))
+    )
+
+    result = (
+        pairs.groupBy("pair")
+             .agg(count("*").alias("pair_count"))
+             .orderBy(desc("pair_count"))
+             .limit(50)
+    )
+
+    result = result.select(
+        split("pair", "\\|\\|\\|").getItem(0).alias("artist1"),
+        split("pair", "\\|\\|\\|").getItem(1).alias("artist2"),
+        "pair_count"
+    )
+
+    return result
+
+
+# ---------- TRIPLETAS DE ARTISTAS MAS FRECUENTES ----------
+def artist_triplets_udf(artists):
+    if not artists:
+        return []
+    seen = list(dict.fromkeys(artists))
+    triplets = []
+    for a, b, c in combinations(seen, 3):
+        if a is None or b is None or c is None:
+            continue
+        ordered = sorted([a, b, c])
+        triplets.append("|||".join(ordered))
+    return triplets
+
+artist_triplets_spark_udf = udf(artist_triplets_udf, ArrayType(StringType()))
+
+def top_50_artist_triplets(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+
+    per_user = df.groupBy("user_id").agg(
+        collect_list("artist_name").alias("artists")
+    )
+
+    trips = (
+        per_user
+        .select(explode(artist_triplets_spark_udf("artists")).alias("triplet"))
+    )
+
+    result = (
+        trips.groupBy("triplet")
+             .agg(count("*").alias("triplet_count"))
+             .orderBy(desc("triplet_count"))
+             .limit(50)
+    )
+
+    result = result.select(
+        split("triplet", "\\|\\|\\|").getItem(0).alias("artist1"),
+        split("triplet", "\\|\\|\\|").getItem(1).alias("artist2"),
+        split("triplet", "\\|\\|\\|").getItem(2).alias("artist3"),
+        "triplet_count"
+    )
+
+    return result
+
+
+# ---------- SOLAPAMIENTO ARTISTA-CANCIÓN ----------
+def artist_track_overlap(spark):
+    df_art = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    df_trk = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_tracks")
+
+    # top artista por usuario
+    w_art = Window.partitionBy("user_id").orderBy(desc("playcount"))
+    top_artist = (
+        df_art.withColumn("rn", row_number().over(w_art))
+              .filter(col("rn") == 1)
+              .select(
+                  "user_id",
+                  col("artist_name").alias("top_artist")
+              )
+    )
+
+    # top canción por usuario
+    w_trk = Window.partitionBy("user_id").orderBy(desc("playcount"))
+    top_track = (
+        df_trk.withColumn("rn", row_number().over(w_trk))
+              .filter(col("rn") == 1)
+              .select(
+                  "user_id",
+                  col("track_name").alias("top_track"),
+                  col("artist_name").alias("track_artist")
+              )
+    )
+
+    joined = top_artist.join(top_track, on="user_id", how="inner")
+
+    total_users = joined.count() or 1
+
+    with_flag = joined.withColumn(
+        "overlap",
+        when(col("top_artist") == col("track_artist"), 1).otherwise(0)
+    )
+
+    overlaps = with_flag.filter(col("overlap") == 1).count()
+    ratio = overlaps / total_users
+
+    return spark.createDataFrame(
+        [(overlaps, total_users, float(ratio))],
+        ["overlap_count", "total_users", "overlap_ratio"]
+    )
+
+
+# ---------- POSICIÓN PROMEDIO POR ARTISTA ----------
+def artist_average_position(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+
+    w = Window.partitionBy("user_id").orderBy(desc("playcount"))
+    ranked = df.withColumn("position", row_number().over(w))
+
+    result = (
+        ranked.groupBy("artist_name")
+              .agg(
+                  avg("position").alias("avg_position"),
+                  countDistinct("user_id").alias("user_count")
+              )
+              .orderBy("avg_position")
+    )
+
+    return result
+
+
+# ---------- FRECUENCIA DE QUE EL #1 ESTÉ EN EL TOP 5 GLOBAL ----------
+def top1_in_global_top5_frequency(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+
+    # top 5 global por número de usuarios que lo escuchan
+    global_top5 = (
+        df.groupBy("artist_name")
+          .agg(countDistinct("user_id").alias("users_count"))
+          .orderBy(desc("users_count"))
+          .limit(5)
+    )
+
+    # artista #1 por usuario
+    w = Window.partitionBy("user_id").orderBy(desc("playcount"))
+    top1 = (
+        df.withColumn("rn", row_number().over(w))
+          .filter(col("rn") == 1)
+          .select("user_id", "artist_name")
+    )
+
+    total_users = top1.select("user_id").distinct().count() or 1
+
+    # usuarios cuyo top1 está en el top5 global
+    matched = top1.join(global_top5, on="artist_name", how="inner")
+    matched_users = matched.select("user_id").distinct().count()
+
+    ratio = matched_users / total_users
+
+    return spark.createDataFrame(
+        [(matched_users, total_users, float(ratio))],
+        ["matched_users", "total_users", "ratio"]
+    )
+
+
+# ---------- ESTABILIDAD DE POSICIONES (MISMO ARTISTA EN #1 Y #2) ----------
+def position_stability_same_artist_top1_top2(spark):
+    df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+
+    w = Window.partitionBy("user_id").orderBy(desc("playcount"))
+    ranked = df.withColumn("rn", row_number().over(w))
+
+    per_user = (
+        ranked.groupBy("user_id")
+              .agg(
+                  Fmax(when(col("rn") == 1, col("artist_name"))).alias("artist_pos1"),
+                  Fmax(when(col("rn") == 2, col("artist_name"))).alias("artist_pos2")
+              )
+    )
+
+    total_users = per_user.count() or 1
+
+    stable = per_user.filter(
+        (col("artist_pos1").isNotNull()) &
+        (col("artist_pos1") == col("artist_pos2"))
+    )
+
+    stable_count = stable.count()
+    ratio = stable_count / total_users
+
+    return spark.createDataFrame(
+        [(stable_count, total_users, float(ratio))],
+        ["stable_users", "total_users", "ratio"]
+    )
+
+
 
 # ============================
 # GUARDAR EN MARIADB
@@ -511,6 +735,7 @@ def run_analysis(spark=None):
         spark = create_spark_session()
         created_here = True
     try: 
+        """
         # Metricas de Popularidad
         print("Calculando Top 20 Artistas...")
         top_artists = top_20_artistas(spark)
@@ -557,13 +782,53 @@ def run_analysis(spark=None):
         low_df = low_coverage_artists(spark)
         low_df.show()
         save_to_mysql(low_df, "low_coverage_artists")
+        """
+
+
+        # --------------------
+        # Métricas de concurrencia
+        # --------------------
+        print("Calculando pares de artistas más frecuentes (top 50)...")
+        artist_pairs_df = top_50_artist_pairs(spark)
+        artist_pairs_df.show(truncate=False)
+        save_to_mysql(artist_pairs_df, "top_50_artist_pairs")
+
+        print("Calculando tripletas de artistas más frecuentes (top 50)...")
+        artist_triplets_df = top_50_artist_triplets(spark)
+        artist_triplets_df.show(truncate=False)
+        save_to_mysql(artist_triplets_df, "top_50_artist_triplets")
+
+        print("Calculando solapamiento artista-canción (top track vs top artist)...")
+        overlap_df = artist_track_overlap(spark)
+        overlap_df.show()
+        save_to_mysql(overlap_df, "artist_track_overlap")
+
+        print("Calculando posición promedio por artista...")
+        avg_pos_df = artist_average_position(spark)
+        avg_pos_df.show()
+        save_to_mysql(avg_pos_df, "artist_average_position")
+
+        print("Calculando frecuencia de que el #1 esté en el top 5 global...")
+        freq_df = top1_in_global_top5_frequency(spark)
+        freq_df.show()
+        save_to_mysql(freq_df, "top1_in_global_top5_frequency")
+
+        print("Calculando estabilidad de posiciones (#1 y #2 mismo artista)...")
+        stability_df = position_stability_same_artist_top1_top2(spark)
+        stability_df.show()
+        save_to_mysql(stability_df, "position_stability_users")
 
         # Metricas de conteos simples
         run_simple_counts_analysis(spark)
         # Metricas de comparaciones simples
         run_simple_compare_analysis(spark)
 
+
+
+        # Conteos simples
+        #run_simple_counts_analysis(spark)
         spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty()
+
         
     except Exception as e:
         print(f"Error durante el análisis: {e}")
