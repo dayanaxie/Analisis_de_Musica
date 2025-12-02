@@ -103,4 +103,4 @@ metastore_db/
 # Secrets locales y llaves
 *.key
 *.pem
-secrets/
+secrets/ 
