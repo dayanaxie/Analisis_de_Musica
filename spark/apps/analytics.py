@@ -491,6 +491,7 @@ artist_triplets_spark_udf = udf(artist_triplets_udf, ArrayType(StringType()))
 
 def top_50_artist_triplets(spark):
     df = spark.read.parquet(f"{HDFS_PARQUET_BASE}/user_top_artists")
+    df = df.filter(col("rank") <= 10)
 
     per_user = df.groupBy("user_id").agg(
         collect_list("artist_name").alias("artists")
@@ -735,7 +736,6 @@ def run_analysis(spark=None):
         spark = create_spark_session()
         created_here = True
     try: 
-        """
         # Metricas de Popularidad
         print("Calculando Top 20 Artistas...")
         top_artists = top_20_artistas(spark)
@@ -788,21 +788,24 @@ def run_analysis(spark=None):
         # --------------------
         # Métricas de concurrencia
         # --------------------
+        """
+
         print("Calculando pares de artistas más frecuentes (top 50)...")
         artist_pairs_df = top_50_artist_pairs(spark)
         artist_pairs_df.show(truncate=False)
         save_to_mysql(artist_pairs_df, "top_50_artist_pairs")
+        """
+
 
         print("Calculando tripletas de artistas más frecuentes (top 50)...")
         artist_triplets_df = top_50_artist_triplets(spark)
         artist_triplets_df.show(truncate=False)
         save_to_mysql(artist_triplets_df, "top_50_artist_triplets")
-
+        """
         print("Calculando solapamiento artista-canción (top track vs top artist)...")
         overlap_df = artist_track_overlap(spark)
         overlap_df.show()
         save_to_mysql(overlap_df, "artist_track_overlap")
-
         print("Calculando posición promedio por artista...")
         avg_pos_df = artist_average_position(spark)
         avg_pos_df.show()
@@ -818,15 +821,12 @@ def run_analysis(spark=None):
         stability_df.show()
         save_to_mysql(stability_df, "position_stability_users")
 
+
         # Metricas de conteos simples
         run_simple_counts_analysis(spark)
         # Metricas de comparaciones simples
         run_simple_compare_analysis(spark)
 
-
-
-        # Conteos simples
-        #run_simple_counts_analysis(spark)
         spark.sparkContext._jsc.sc().listenerBus().waitUntilEmpty()
 
         
